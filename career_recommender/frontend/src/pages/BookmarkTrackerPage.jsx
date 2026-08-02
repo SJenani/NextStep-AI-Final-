@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import client from "../api/client";
 import { BookmarkSkeleton } from "../components/skeletons/PageSkeleton";
+import TailorResumeModal from "../components/TailorResumeModal";
 
 const statuses = [
   { value: "saved", label: "Saved", color: "slate" },
@@ -99,6 +100,7 @@ export default function BookmarkTrackerPage() {
   const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState("all");
   const [updatingId, setUpdatingId] = useState(null);
+  const [tailoringJob, setTailoringJob] = useState(null);
 
   const loadBookmarks = async () => {
     setLoading(true);
@@ -300,7 +302,7 @@ export default function BookmarkTrackerPage() {
                         tone="bg-teal-600"
                       />
 
-                      <div className="grid gap-3 sm:grid-cols-[minmax(0,1fr)_130px] xl:grid-cols-1">
+                      <div className="grid gap-3 sm:grid-cols-[minmax(0,1fr)_auto_auto] xl:grid-cols-1">
                         <label className="sr-only" htmlFor={`status-${bookmark.id}`}>
                           Application stage
                         </label>
@@ -333,6 +335,18 @@ export default function BookmarkTrackerPage() {
                             No link
                           </span>
                         )}
+
+                        <button
+                          type="button"
+                          onClick={() => setTailoringJob({
+                            job_title: bookmark.job_title,
+                            company_name: bookmark.company_name,
+                            job_description: bookmark.description || ""
+                          })}
+                          className="inline-flex h-11 items-center justify-center gap-2 rounded-xl border border-blue-200 bg-blue-50 text-blue-700 px-4 text-sm font-extrabold hover:bg-blue-100 transition"
+                        >
+                          Tailor Resume
+                        </button>
                       </div>
                     </div>
                   </div>
@@ -361,6 +375,7 @@ export default function BookmarkTrackerPage() {
           </div>
         )}
       </section>
+      <TailorResumeModal job={tailoringJob} onClose={() => setTailoringJob(null)} />
     </div>
   );
 }

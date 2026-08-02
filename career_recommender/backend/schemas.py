@@ -1,7 +1,127 @@
 from datetime import datetime
 from typing import Any, Literal
 
-from pydantic import BaseModel, ConfigDict, EmailStr, Field, model_validator
+from pydantic import BaseModel, ConfigDict, EmailStr, Field, field_validator, model_validator
+
+
+BLOCKED_EMAIL_DOMAINS = {
+    "10minutemail.com",
+    "10minutemail.net",
+    "20minutemail.com",
+    "dispostable.com",
+    "emailondeck.com",
+    "fakeinbox.com",
+    "guerrillamail.com",
+    "guerrillamail.net",
+    "guerrillamail.org",
+    "maildrop.cc",
+    "mailinator.com",
+    "mailnesia.com",
+    "moakt.com",
+    "tempmail.com",
+    "temp-mail.org",
+    "tempail.com",
+    "throwawaymail.com",
+    "trashmail.com",
+    "yopmail.com",
+    "example.edu",
+    "example.com",
+    "example.net",
+    "example.org",
+    "localhost",
+    "localdomain",
+    "test.com",
+    "fake.com",
+    "invalid.com",
+}
+
+BLOCKED_LOCAL_PARTS = {
+    "a",
+    "aa",
+    "abc",
+    "admin",
+    "demo",
+    "email",
+    "fake",
+    "foo",
+    "hello",
+    "mail",
+    "me",
+    "no-reply",
+    "noreply",
+    "none",
+    "sample",
+    "test",
+    "testing",
+    "user",
+}
+
+SUSPICIOUS_EMAIL_TERMS = (
+    "asdf",
+    "dummy",
+    "fake",
+    "invalid",
+    "qwerty",
+    "sample",
+    "test",
+    "trash",
+)
+
+
+def _has_valid_domain_labels(domain: str) -> bool:
+    labels = domain.split(".")
+    return all(
+        2 <= len(label) <= 63
+        and label[0].isalnum()
+        and label[-1].isalnum()
+        and all(character.isalnum() or character == "-" for character in label)
+        for label in labels
+    )
+
+
+def validate_real_email(value: str) -> str:
+    normalized = str(value).strip().lower()
+    if "@" not in normalized:
+        raise ValueError("Enter a valid email address.")
+
+    local_part, domain = normalized.rsplit("@", 1)
+    if not local_part or not domain or "." not in domain:
+        raise ValueError("Enter a valid email address.")
+
+    domain_parts = domain.split(".")
+    top_level_domain = domain_parts[-1] if domain_parts else ""
+
+    if (
+        len(local_part) < 2
+        or len(local_part) > 64
+        or ".." in normalized
+        or local_part.startswith(".")
+        or local_part.endswith(".")
+        or not _has_valid_domain_labels(domain)
+        or len(top_level_domain) < 2
+        or len(top_level_domain) > 24
+    ):
+        raise ValueError("Enter a valid email address.")
+
+    if (
+        domain in BLOCKED_EMAIL_DOMAINS
+        or domain.endswith(".invalid")
+        or domain.endswith(".test")
+        or domain.endswith(".example")
+        or domain.endswith(".localhost")
+    ):
+        raise ValueError("Use a real personal, school, or work email address.")
+
+    compact_local = local_part.replace(".", "").replace("_", "").replace("-", "")
+    if (
+        local_part in BLOCKED_LOCAL_PARTS
+        or any(term in local_part or term in domain for term in SUSPICIOUS_EMAIL_TERMS)
+        or local_part.isdigit()
+        or (len(compact_local) >= 5 and len(set(compact_local)) == 1)
+    ):
+        raise ValueError("This looks like a fake email address. Use a real email to continue.")
+
+    return normalized
 
 
 class Token(BaseModel):
@@ -14,12 +134,22 @@ class UserCreate(BaseModel):
     email: EmailStr
     password: str = Field(..., min_length=6, max_length=120)
 
+    @field_validator("email")
+    @classmethod
+    def reject_fake_email(cls, value: EmailStr) -> str:
+        return validate_real_email(str(value))
+
 
 class UserReplaceRequest(BaseModel):
     full_name: str = Field(..., min_length=2, max_length=120)
     email: EmailStr
     current_password: str = Field(..., min_length=6, max_length=120)
     new_password: str = Field(..., min_length=6, max_length=120)
+
+    @field_validator("email")
+    @classmethod
+    def reject_fake_email(cls, value: EmailStr) -> str:
+        return validate_real_email(str(value))
 
 
 class UserOut(BaseModel):
@@ -42,6 +172,7 @@ class ProfileCreate(BaseModel):
     experience_level: Literal["fresher", "entry", "mid", "senior", "lead", "student"]
     mode: Literal["job", "internship"]
     desired_role: str | None = None
+    resume_text: str | None = None
 
     @model_validator(mode="after")
     def validate_role_matches_mode(self):
@@ -101,6 +232,20 @@ class ResumeUploadResponse(BaseModel):
     structured_profile: StructuredProfileDraft
     documents: list[ParsedDocumentSummary] = Field(default_factory=list)
     resume_audit: "ResumeAuditResponse | None" = None
+
+
+class DOCXExportRequest(BaseModel):
+    name: str = ""
+    role: str = ""
+    email: str = ""
+    github: str = ""
+    linkedin: str = ""
+    summary: str = ""
+    skills: list[str] = Field(default_factory=list)
+    tools: list[str] = Field(default_factory=list)
+    projects: list[str] = Field(default_factory=list)
+    experience: list[str] = Field(default_factory=list)
+    certifications: list[str] = Field(default_factory=list)
 
 
 class ResumeAuditSection(BaseModel):
@@ -233,6 +378,14 @@ class JobRecommendation(BaseModel):
     source: str = "RapidAPI JSearch"
 
 
+class SkillBasedRecommendation(BaseModel):
+    role: str
+    match_score: float
+    matched_skills: list[str]
+    missing_skills: list[str]
+    opportunities: list[JobRecommendation] = Field(default_factory=list)
+
+
 class RecommendationResponse(BaseModel):
     mode: str
     profile_snapshot: dict[str, Any]
@@ -246,6 +399,8 @@ class RecommendationResponse(BaseModel):
     project_suggestions: list[ProjectSuggestion]
     roadmap: RoadmapResponse | None = None
     gap_chart: list[dict[str, Any]] = Field(default_factory=list)
+    skill_based_recommendations: list[SkillBasedRecommendation] = Field(default_factory=list)
+
 
 
 class SkillFamilyGap(BaseModel):
@@ -254,6 +409,7 @@ class SkillFamilyGap(BaseModel):
     target_level: float
     gap_level: float
     demand_count: int = 0
+    job_count: int = 0
     strength_count: int = 0
     gap_count: int = 0
     matched_micro_skills: list[str] = Field(default_factory=list)
@@ -384,7 +540,7 @@ class ChatbotResponse(BaseModel):
     question: str
     answer: str
     provider: str = "openai"
-    model: str = "gpt-5.4-mini"
+    model: str = "gpt-4o-mini"
     suggestions: list[str] = Field(default_factory=list)  # Smart follow-up suggestions
 
 
@@ -818,8 +974,131 @@ class WebhookEvent(BaseModel):
     timestamp: str  # ISO format
     data: WebhookJobCreate | WebhookJobUpdate | WebhookJobDelete
 
-
 class WebhookResponse(BaseModel):
     status: str = "success"
     message: str | None = None
     job_id: str | None = None
+
+
+class MilestoneUpdatePayload(BaseModel):
+    step_id: str
+    completed: bool
+
+
+class ProjectUpdatePayload(BaseModel):
+    project_id: str
+    status: str  # "Not Started", "In Progress", "Completed"
+    repo: str | None = None
+    demo: str | None = None
+    notes: str | None = None
+    completed_date: str | None = None
+
+
+class ResourceUpdatePayload(BaseModel):
+    resource_id: str
+    started_date: str | None = None
+    completed_date: str | None = None
+    time_spent: float = 0.0
+    percent: float = 0.0
+
+
+class PracticeSavePayload(BaseModel):
+    technical_score: float
+    hr_score: float
+    confidence_score: float
+    response_time: float
+    questions_count: int
+    correct_count: int
+
+
+class ProjectAnalysisResponse(BaseModel):
+    architecture: str
+    code_quality: str
+    documentation: str
+    portfolio_value: str
+    resume_impact: str
+    deployment: str
+    suggestions: list[str] = Field(default_factory=list)
+
+
+class RoadmapProgressOut(BaseModel):
+    completed_milestones: list[str] = Field(default_factory=list)
+    projects: dict = Field(default_factory=dict)
+    learning_resources: dict = Field(default_factory=dict)
+    weekly_goals: list = Field(default_factory=list)
+    achievements: list = Field(default_factory=list)
+    interview_practice: dict = Field(default_factory=dict)
+    daily_mentor: dict = Field(default_factory=dict)
+    learning_streak: int = 0
+    last_active_date: str | None = None
+
+
+class CompanyReadinessOut(BaseModel):
+    company_name: str
+    match_percentage: float
+    required_skills: list[str] = Field(default_factory=list)
+    missing_skills: list[str] = Field(default_factory=list)
+    expected_salary: str
+    hiring_trend: str
+    learning_priority: str
+
+
+class DailyMentorOut(BaseModel):
+    suggestion: str
+    date: str
+
+
+class AchievementOut(BaseModel):
+    badges: list[str] = Field(default_factory=list)
+
+
+class ApplicationStatusUpdate(BaseModel):
+    status: Literal["Applied", "Interviewing", "Offer", "Rejected", "Saved"]
+
+class PDFExportRequest(BaseModel):
+    html: str
+
+
+class RoadmapExportPayload(BaseModel):
+    format: Literal["pdf", "markdown", "checklist", "csv"]
+
+
+class RoadmapExportResponse(BaseModel):
+    format: str
+    content: str
+
+
+class ResumeTailorRequest(BaseModel):
+    job_title: str
+    company_name: str | None = None
+    job_description: str
+
+
+class TailoredBullet(BaseModel):
+    original: str
+    suggested: str
+    justification: str
+
+
+class ResumeTailorResponse(BaseModel):
+    original_skills_found: list[str]
+    missing_skills_found: list[str]
+    ats_score_before: int
+    ats_score_after: int
+    tailored_summary: str
+    tailored_bullets: list[TailoredBullet]
+    cover_letter: str
+class GeneratePDFRequest(BaseModel):
+    title: str
+    content: str
+class StarAuditRequest(BaseModel):
+    bullets: list[str]
+
+class StarAuditResult(BaseModel):
+    original: str
+    is_weak: bool
+    critique: str
+    suggested_rewrite: str
+
+class StarAuditResponse(BaseModel):
+    audits: list[StarAuditResult]

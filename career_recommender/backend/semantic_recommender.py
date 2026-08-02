@@ -7,7 +7,7 @@ provided job documents. `recommend()` embeds a user query and returns ranked
 jobs with hybrid scores (semantic + skill + freshness).
 """
 
-from _future_ import annotations
+from __future__ import annotations
 
 import logging
 import os
@@ -17,7 +17,7 @@ from typing import Optional
 import numpy as np
 from sentence_transformers import SentenceTransformer
 
-logger = logging.getLogger(_name_)
+logger = logging.getLogger(__name__)
 
 
 # ------------------------------------------------------------------
@@ -65,7 +65,7 @@ def _hybrid_score(
 class SemanticRecommender:
     """Lightweight wrapper around SentenceTransformer + FAISS."""
 
-    def _init_(self, model_name: str = "all-MiniLM-L6-v2") -> None:
+    def __init__(self, model_name: str = "all-MiniLM-L6-v2") -> None:
         logger.info("Loading embedder: %s", model_name)
 
         allow_download = os.getenv("SEMANTIC_MODEL_ALLOW_DOWNLOAD", "false").lower() == "true"

@@ -691,7 +691,7 @@ def _build_quick_win_skills(profile_skills: set[str], missing: Counter, trending
     return results
 
 
-def _build_family_gaps(profile_skills: set[str], matched: Counter, missing: Counter, trending: Counter) -> list[dict]:
+def _build_family_gaps(profile_skills: set[str], matched: Counter, missing: Counter, trending: Counter, ranked_jobs: list[dict] | None = None) -> list[dict]:
     family_rows: list[dict] = []
     family_demand_totals = [
         sum(missing.get(skill, 0) + trending.get(skill, 0) + matched.get(skill, 0) for skill in family["skills"])
@@ -706,6 +706,17 @@ def _build_family_gaps(profile_skills: set[str], matched: Counter, missing: Coun
         missing_skills = _sorted_skills_by_signal(family_skill_set & set(missing), missing, trending, limit=5)
 
         demand_count = sum(missing.get(skill, 0) + trending.get(skill, 0) for skill in family_skill_set)
+        job_count = 0
+        for job in ranked_jobs or []:
+            job_skill_set = set(
+                normalize_skills(
+                    list(job.get("matched_skills") or [])
+                    + list(job.get("missing_skills") or [])
+                    + extract_skills_from_text(f"{job.get('job_title', '')} {job.get('job_description', '')}")
+                )
+            )
+            if family_skill_set & job_skill_set:
+                job_count += 1
         matched_signal = sum(matched.get(skill, 0) for skill in family_skill_set)
         missing_signal = sum(missing.get(skill, 0) for skill in family_skill_set)
         family_size = max(len(family_skill_set), 1)
@@ -757,6 +768,7 @@ def _build_family_gaps(profile_skills: set[str], matched: Counter, missing: Coun
                 "target_level": target_level,
                 "gap_level": gap_level,
                 "demand_count": demand_count,
+                "job_count": job_count,
                 "strength_count": len(set(owned_skills) | set(matched_skills)),
                 "gap_count": len(missing_skills),
                 "matched_micro_skills": (matched_skills or owned_skills)[:4],
@@ -847,44 +859,132 @@ def _tokenize_resume_role(target_role: str | None) -> list[str]:
     ]
 
 
-def _section_checks(resume_text: str) -> tuple[list[dict], float]:
+def _section_checks(resume_text: str, user_name: str = "") -> tuple[list[dict], float]:
     normalized = (resume_text or "").lower()
     checks: list[dict] = []
 
-    for title, patterns, detail in RESUME_SECTION_RULES:
-        if title == "Education":
-            grad_present = any(re.search(pattern, normalized) for pattern in patterns)
-            tenth_present = bool(re.search(r"\b(10th|sslc|matriculation|tenth)\b", normalized))
-            twelfth_present = bool(re.search(r"\b(12th|hsc|higher secondary|intermediate|twelfth)\b", normalized))
-            
-            present = grad_present and tenth_present and twelfth_present
-            
-            if present:
-                final_detail = detail
-            else:
-                missing_parts = []
-                if not grad_present: missing_parts.append("graduation degree")
-                if not tenth_present: missing_parts.append("10th marksheet")
-                if not twelfth_present: missing_parts.append("12th marksheet")
-                
-                final_detail = f"Missing: {', '.join(missing_parts)}. Add your complete academic history (graduation, 10th, and 12th details) to strengthen ATS readability."
-                
-            checks.append({
-                "title": title,
-                "present": present,
-                "detail": final_detail
-            })
-        else:
-            present = any(re.search(pattern, normalized) for pattern in patterns)
-            checks.append(
-                {
-                    "title": title,
-                    "present": present,
-                    "detail": detail if present else f"Add a clear {title.lower()} section to strengthen ATS readability.",
-                }
-            )
+    # 1. Full Name
+    name_present = False
+    if user_name:
+        parts = [p.strip().lower() for p in user_name.split() if len(p.strip()) > 2]
+        if parts:
+            name_present = any(part in normalized for part in parts)
+    else:
+        name_present = len(normalized.strip()) > 10
+        
+    checks.append({
+        "title": "Full Name",
+        "present": name_present,
+        "detail": "Include your full name at the top of the resume." if not name_present else "Full name is present."
+    })
 
-    score = round((sum(1 for item in checks if item["present"]) / max(len(checks), 1)) * 100, 2)
+    # 2. Email Address
+    email_pattern = r"\b[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}\b"
+    email_present = bool(re.search(email_pattern, normalized))
+    checks.append({
+        "title": "Email Address",
+        "present": email_present,
+        "detail": "Add a professional email address for communication." if not email_present else "Email address is present."
+    })
+
+    # 3. Phone Number
+    phone_pattern = r"\b(?:\+?\d{1,3}[-.\s]?)?\(?\d{3}\)?[-.\s]?\d{3}[-.\s]?\d{4}\b|\b\d{10}\b|\b\d{5}\s\d{5}\b"
+    phone_present = bool(re.search(phone_pattern, normalized))
+    checks.append({
+        "title": "Phone Number",
+        "present": phone_present,
+        "detail": "Provide a phone number so recruiters can reach you." if not phone_present else "Phone number is present."
+    })
+
+    # 4. LinkedIn Profile
+    linkedin_present = "linkedin.com/in/" in normalized or "linkedin.com/" in normalized
+    checks.append({
+        "title": "LinkedIn Profile",
+        "present": linkedin_present,
+        "detail": "Include your LinkedIn profile link to showcase professional network." if not linkedin_present else "LinkedIn profile is present."
+    })
+
+    # 5. GitHub/Portfolio
+    portfolio_present = any(kw in normalized for kw in ["github.com", "portfolio", "personal website", "behance.net", "dribbble.com", "gitlab.com"])
+    checks.append({
+        "title": "GitHub/Portfolio",
+        "present": portfolio_present,
+        "detail": "Add links to your GitHub or portfolio to display active projects." if not portfolio_present else "GitHub/Portfolio link is present."
+    })
+
+    # 6. Professional Summary
+    summary_present = any(re.search(p, normalized) for p in [r"\b(summary|profile|objective|about me)\b", r"\bcareer objective\b"])
+    checks.append({
+        "title": "Professional Summary",
+        "present": summary_present,
+        "detail": "Shows recruiters quickly what role you target and what value you bring." if not summary_present else "Professional summary is present."
+    })
+
+    # 7. Technical Skills
+    tech_skills_present = any(re.search(p, normalized) for p in [r"\b(technical skills|skills|tech stack|technologies|languages|frameworks|tools|databases|developer tools)\b"])
+    checks.append({
+        "title": "Technical Skills",
+        "present": tech_skills_present,
+        "detail": "List your developer skills, frameworks, and programming languages." if not tech_skills_present else "Technical skills section is present."
+    })
+
+    # 8. Soft Skills
+    soft_skills_present = any(re.search(p, normalized) for p in [r"\b(soft skills|interpersonal skills|strengths|competencies|professional skills|leadership|communication|collaboration|teamwork|problem solving)\b"])
+    checks.append({
+        "title": "Soft Skills",
+        "present": soft_skills_present,
+        "detail": "Include key soft skills like communication, leadership, or teamwork." if not soft_skills_present else "Soft skills section is present."
+    })
+
+    # 9. Work Experience
+    experience_present = any(re.search(p, normalized) for p in [r"\b(experience|work experience|employment|professional experience|internships|work history)\b"])
+    checks.append({
+        "title": "Work Experience",
+        "present": experience_present,
+        "detail": "Demonstrates applied work, internships, freelance work, or leadership." if not experience_present else "Work experience section is present."
+    })
+
+    # 10. Projects
+    projects_present = any(re.search(p, normalized) for p in [r"\b(projects|academic projects|personal projects|key projects|capstone projects)\b"])
+    checks.append({
+        "title": "Projects",
+        "present": projects_present,
+        "detail": "Gives direct proof that you can build role-relevant work." if not projects_present else "Projects section is present."
+    })
+
+    # 11. Education
+    education_present = any(re.search(p, normalized) for p in [r"\b(education|coursework|university|college|b\.tech|btech|b\.e|be|bsc|msc|academic history)\b"])
+    checks.append({
+        "title": "Education",
+        "present": education_present,
+        "detail": "Provides academic context and helps recruiters understand your background." if not education_present else "Education section is present."
+    })
+
+    # 12. Certifications
+    certifications_present = any(re.search(p, normalized) for p in [r"\b(certifications|certification|credentials|certified|courses|licensed)\b"])
+    checks.append({
+        "title": "Certifications",
+        "present": certifications_present,
+        "detail": "Add external courses, certifications, or license proofs." if not certifications_present else "Certifications section is present."
+    })
+
+    # 13. Achievements
+    achievements_present = any(re.search(p, normalized) for p in [r"\b(achievements|awards|honors|accolades|recognition|extracurricular activities)\b"])
+    checks.append({
+        "title": "Achievements",
+        "present": achievements_present,
+        "detail": "Highlight academic awards, hackathon wins, or key accomplishments." if not achievements_present else "Achievements section is present."
+    })
+
+    # 14. Languages
+    languages_present = any(re.search(p, normalized) for p in [r"\b(languages|bilingual|multilingual|english|hindi|tamil|telugu|kannada|french|spanish|german)\b"])
+    checks.append({
+        "title": "Languages",
+        "present": languages_present,
+        "detail": "List languages you speak (e.g. English, Hindi, German) for global opportunities." if not languages_present else "Languages section is present."
+    })
+
+    score = round((sum(1 for item in checks if item["present"]) / 14.0) * 100, 2)
     return checks, score
 
 
@@ -966,7 +1066,14 @@ def generate_resume_audit(profile, jobs: list[dict], target_role: str | None = N
 
     keyword_match_score = round((len(matched_keywords) / max(len(market_skills), 1)) * 100, 2) if candidate_skills and market_skills else 0.0
     role_alignment_score, matched_role_tokens = _role_alignment_score(resolved_role, resume_text, resume_skills)
-    section_checks, section_score = _section_checks(resume_text)
+
+    user_name = ""
+    if hasattr(profile, "user") and profile.user:
+        user_name = profile.user.full_name
+    elif hasattr(profile, "full_name"):
+        user_name = profile.full_name
+
+    section_checks, section_score = _section_checks(resume_text, user_name)
     impact_score, impact_signals = _impact_score(resume_text)
     resume_strength_score = round((section_score * 0.6) + (impact_score * 0.4), 2)
     market_readiness_score = _market_readiness_score(candidate_skills, jobs)
@@ -1137,10 +1244,10 @@ def _fallback_projects(target_role: str | None) -> list[dict]:
 def _project_suggestions(target_role: str | None, missing_skills: list[str]) -> list[dict]:
     suggestions: list[dict] = []
     seen_titles: set[str] = set()
-    normalized_role = (target_role or "").strip().lower()
+    normalized_role = (target_role or "").strip().lower().replace(" ", "")
 
     for role_keyword, role_suggestions in ROLE_PROJECT_SUGGESTIONS.items():
-        if role_keyword in normalized_role:
+        if role_keyword.replace(" ", "") in normalized_role:
             for suggestion in role_suggestions:
                 title = suggestion["title"]
                 if title not in seen_titles:
@@ -1322,7 +1429,7 @@ def build_skill_dashboard(profile, ranked_jobs: list[dict]) -> dict:
     for skill, value in trending.most_common(8):
         gap_chart.append({"skill": skill, "type": "trending", "value": value})
 
-    family_gaps = _build_family_gaps(profile_skills, matched, missing, trending)
+    family_gaps = _build_family_gaps(profile_skills, matched, missing, trending, ranked_jobs)
     quick_win_skills = _build_quick_win_skills(profile_skills, missing, trending)
     skill_dna_profiles = _build_skill_dna_profiles(profile_skills, ranked_jobs)
     micro_gap_summary = {
@@ -1342,3 +1449,65 @@ def build_skill_dashboard(profile, ranked_jobs: list[dict]) -> dict:
         "micro_gap_summary": micro_gap_summary,
         "skill_dna_profiles": skill_dna_profiles,
     }
+
+
+ROLE_SKILL_REQUIREMENTS = {
+    "Backend Developer": {"python", "java", "fastapi", "django", "flask", "spring boot", "node.js", "express", "sql", "postgresql", "mysql", "mongodb", "redis", "api", "jwt", "oauth", "rest api", "c++", "c#", "git", "github", "linux"},
+    "Frontend Developer": {"javascript", "typescript", "react", "next.js", "html", "css", "tailwind css", "bootstrap", "figma", "ui/ux", "git", "github"},
+    "Fullstack Developer": {"python", "javascript", "typescript", "react", "next.js", "node.js", "express", "fastapi", "sql", "postgresql", "mongodb", "html", "css", "tailwind css", "git", "github"},
+    "Data Analyst": {"sql", "excel", "power bi", "tableau", "data analysis", "data visualization", "pandas", "numpy", "python"},
+    "Machine Learning Engineer": {"python", "machine learning", "deep learning", "scikit-learn", "tensorflow", "pytorch", "nlp", "llm", "rag", "agents", "pandas", "numpy", "data science"},
+    "AI Engineer": {"python", "llm", "rag", "agents", "machine learning", "deep learning", "pytorch", "tensorflow", "nlp", "prompting", "api"},
+    "Cloud & DevOps Engineer": {"docker", "kubernetes", "aws", "azure", "gcp", "linux", "git", "github", "deployment"},
+    "Digital Marketing Specialist": {"seo", "content marketing", "digital marketing", "google analytics", "salesforce"},
+}
+
+
+def suggest_roles_by_skills(user_skills: list[str], domain: str | None = None) -> list[dict]:
+    normalized_user = set(normalize_skills(user_skills))
+    role_scores = []
+    
+    if normalized_user:
+        for role, role_skills in ROLE_SKILL_REQUIREMENTS.items():
+            matched = normalized_user & role_skills
+            missing = role_skills - normalized_user
+            
+            match_score = (len(matched) / len(role_skills)) * 100 if role_skills else 0.0
+            
+            if len(matched) > 0:
+                role_scores.append({
+                    "role": role,
+                    "match_score": round(match_score, 2),
+                    "matched_skills": sorted(list(matched)),
+                    "missing_skills": sorted(list(missing))
+                })
+        # Sort by match score descending, then by number of matched skills descending
+        role_scores.sort(key=lambda x: (x["match_score"], len(x["matched_skills"])), reverse=True)
+        
+    # Fallback to domain-based default roles if no roles matched or user has no skills
+    if not role_scores:
+        dom = (domain or "").strip().lower()
+        fallback_roles = []
+        if "frontend" in dom:
+            fallback_roles = ["Frontend Developer", "UI/UX Designer"]
+        elif "data" in dom or "analytics" in dom or "business" in dom:
+            fallback_roles = ["Data Analyst", "Business Analyst"]
+        elif "ai" in dom or "machine learning" in dom or "ml" in dom:
+            fallback_roles = ["AI Engineer", "Machine Learning Engineer"]
+        elif "marketing" in dom:
+            fallback_roles = ["Digital Marketing Specialist"]
+        elif "cloud" in dom or "devops" in dom:
+            fallback_roles = ["Cloud & DevOps Engineer"]
+        else:
+            fallback_roles = ["Backend Developer", "Fullstack Developer", "Software Engineer"]
+            
+        for role in fallback_roles:
+            role_skills = ROLE_SKILL_REQUIREMENTS.get(role, set())
+            role_scores.append({
+                "role": role,
+                "match_score": 0.0,
+                "matched_skills": [],
+                "missing_skills": sorted(list(role_skills))
+            })
+            
+    return role_scores[:3]

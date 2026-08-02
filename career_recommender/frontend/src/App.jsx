@@ -72,6 +72,14 @@ export default function App() {
           }
         />
         <Route
+          path="/skill-gap"
+          element={
+            <ProtectedRoute>
+              <DashboardPage view="skill-gap" />
+            </ProtectedRoute>
+          }
+        />
+        <Route
           path="/recommendations"
           element={
             <ProtectedRoute>

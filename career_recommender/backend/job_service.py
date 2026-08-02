@@ -21,9 +21,10 @@ def _job_matches_mode(job_posting: models.JobPosting, mode: str) -> bool:
 
 
 def _tokenize_query(value: str | None) -> set[str]:
+    cleaned = (value or "").lower().replace("fullstack", "full stack").replace("/", " ").replace("-", " ")
     return {
         token
-        for token in (value or "").lower().replace("/", " ").replace("-", " ").split()
+        for token in cleaned.split()
         if len(token) > 2
     }
 

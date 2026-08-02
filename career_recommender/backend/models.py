@@ -237,3 +237,42 @@ class JobPosting(Base):
     raw_payload = Column(JSON, default=dict, nullable=False)
 
     employer = relationship("Employer", back_populates="job_postings")
+
+
+class UserRoadmapProgress(Base):
+    __tablename__ = "user_roadmap_progress"
+
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False, unique=True, index=True)
+    
+    # Milestones & stages: lists of completed step/stage IDs, e.g. ["step-0", "stage-1"]
+    completed_milestones = Column(JSON, default=list, nullable=False)
+    
+    # Projects: dict mapping project index/id to project metadata:
+    # { "0": { "status": "In Progress", "repo": "...", "demo": "...", "notes": "...", "completed_date": "..." } }
+    projects = Column(JSON, default=dict, nullable=False)
+    
+    # Learning resources: dict mapping resource id to tracking metadata:
+    # { "res-0": { "started_date": "...", "completed_date": "...", "time_spent": 12, "percent": 50, "streak": 2 } }
+    learning_resources = Column(JSON, default=dict, nullable=False)
+    
+    # Weekly goals: list of objects:
+    # [ { "week": 1, "goals": [ { "id": "g-0", "title": "...", "type": "learning", "done": false } ] } ]
+    weekly_goals = Column(JSON, default=list, nullable=False)
+    
+    # Achievements: list of badge names unlocked, e.g. ["First Milestone", "First Project"]
+    achievements = Column(JSON, default=list, nullable=False)
+    
+    # Interview Practice: dict mapping metric keys or logs
+    # { "technical_score": 85, "hr_score": 90, "avg_response_time": 15, "history": [...] }
+    interview_practice = Column(JSON, default=dict, nullable=False)
+
+    # Daily Mentor suggestion: dict mapping { "date": "YYYY-MM-DD", "suggestion": "..." }
+    daily_mentor = Column(JSON, default=dict, nullable=False)
+    
+    # Metadata
+    learning_streak = Column(Integer, default=0, nullable=False)
+    last_active_date = Column(String(50), nullable=True)
+    
+    created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False)

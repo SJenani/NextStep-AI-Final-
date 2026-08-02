@@ -721,9 +721,15 @@ def _preferred_market_location() -> str | None:
 
 
 def _normalize_token_set(*values: str | None) -> set[str]:
+    cleaned_values = []
+    for value in values:
+        if value:
+            cleaned_values.append(value.lower().replace("fullstack", "full stack"))
+        else:
+            cleaned_values.append(value)
     return {
         token
-        for value in values
+        for value in cleaned_values
         for token in re.findall(r"[a-z0-9]+", (value or "").lower())
         if len(token) > 2 and token not in ROLE_STOP_WORDS
     }

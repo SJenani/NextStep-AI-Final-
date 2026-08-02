@@ -1,5 +1,8 @@
-import { Link, NavLink } from "react-router-dom";
+import { useEffect, useState } from "react";
+import { Link, NavLink, useLocation } from "react-router-dom";
+import { Menu, X } from "lucide-react";
 import { useAuth } from "../context/AuthContext";
+import ThemePanel from "../components/ThemePanel";
 
 const featureCards = [
   "Real-time job and internship recommendations with AI ranking.",
@@ -8,137 +11,211 @@ const featureCards = [
   "Personalized 30/60/90-day roadmap, projects, and interview prep.",
 ];
 
+function profileStorageKey(user, key) {
+  return `career_profile_${user?.id || user?.email || "local"}_${key}`;
+}
+
 export default function HomePage() {
   const auth = useAuth() || {};
   const { user, logout = () => {} } = auth;
-  const navItems = user
-    ? [
-        { label: "Dashboard", to: "/dashboard" },
-        { label: "Skill Gap", to: "/dashboard" },
-        { label: "Roadmap", to: "/roadmap" },
-        { label: "AI Mentor", to: "/chatbot" },
-      ]
-    : [
-        { label: "Features", to: "#features" },
-        { label: "How it works", to: "#how-it-works" },
-      ];
+  const location = useLocation();
+  const [isMenuOpen, setIsMenuOpen] = useState(false);
+  const [profilePhoto, setProfilePhoto] = useState("");
+  const navItems = [
+    { label: "Dashboard", to: "/dashboard", match: "/dashboard" },
+    { label: "Skill Gap", to: "/dashboard#skill-gap", match: "/dashboard#skill-gap" },
+    { label: "Roadmap", to: "/roadmap", match: "/roadmap" },
+    { label: "AI Mentor", to: "/chatbot", match: "/chatbot" },
+  ];
+  const displayName = user?.full_name || user?.email?.split("@")[0] || "Guest";
+  const initials = displayName
+    .split(" ")
+    .filter(Boolean)
+    .slice(0, 2)
+    .map((part) => part[0]?.toUpperCase())
+    .join("") || "AI";
+
+  const isActiveItem = (item) => {
+    const current = `${location.pathname}${location.hash}`;
+    if (item.match.includes("#")) {
+      return current === item.match;
+    }
+    return location.pathname === item.match && !location.hash;
+  };
+
+  const closeMenu = () => setIsMenuOpen(false);
+
+  useEffect(() => {
+    const loadProfilePhoto = () => {
+      setProfilePhoto(window.localStorage.getItem(profileStorageKey(user, "photo")) || "");
+    };
+
+    loadProfilePhoto();
+    window.addEventListener("focus", loadProfilePhoto);
+    window.addEventListener("storage", loadProfilePhoto);
+    window.addEventListener("nextstep-profile-photo-updated", loadProfilePhoto);
+
+    return () => {
+      window.removeEventListener("focus", loadProfilePhoto);
+      window.removeEventListener("storage", loadProfilePhoto);
+      window.removeEventListener("nextstep-profile-photo-updated", loadProfilePhoto);
+    };
+  }, [user]);
 
   return (
-    <div className="mx-auto w-[85vw] max-w-[1800px] space-y-8 py-4">
-      <header className="sticky top-4 z-30 rounded-[28px] border border-slate-200 bg-white/95 px-4 py-3 shadow-[0_18px_45px_rgba(15,23,42,0.08)] backdrop-blur">
-        <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
-          <Link to="/" className="flex items-center gap-3">
-            <span className="flex h-11 w-11 items-center justify-center rounded-2xl bg-slate-950 text-sm font-bold text-white">
-              AI
-            </span>
-            <span>
-              <span className="block text-base font-bold text-slate-950">Next Step AI</span>
-              <span className="block text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">
-                Smart guidance
+    <main className="home-page">
+      <div className="home-shell">
+        <header className="home-header" aria-label="Primary navigation">
+          <div className="home-header-inner">
+            <Link to="/" className="home-brand-link" onClick={closeMenu}>
+              <span className="home-logo-mark">
+                <img src="/images/next-step-ai-logo.png" alt="" />
               </span>
-            </span>
-          </Link>
+              <span>
+                <span className="home-brand-title">Next Step AI</span>
+                <span className="home-brand-subtitle">
+                  Smart guidance
+                </span>
+              </span>
+            </Link>
 
-          <nav className="flex flex-wrap items-center gap-2">
-            {navItems.map((item) =>
-              item.to.startsWith("#") ? (
-                <a
-                  key={item.to}
-                  href={item.to}
-                  className="rounded-xl px-3 py-2 text-sm font-semibold text-slate-600 transition hover:bg-slate-100 hover:text-slate-950"
-                >
-                  {item.label}
-                </a>
-              ) : (
+            <nav className="home-nav-links" aria-label="Main menu">
+              {navItems.map((item) => (
                 <NavLink
-                  key={item.to}
+                  key={item.label}
                   to={item.to}
-                  className="rounded-xl px-3 py-2 text-sm font-semibold text-slate-600 transition hover:bg-slate-100 hover:text-slate-950"
+                  className={`home-nav-link ${isActiveItem(item) ? "active" : ""}`}
+                  onClick={closeMenu}
                 >
                   {item.label}
                 </NavLink>
-              )
-            )}
-          </nav>
+              ))}
+            </nav>
 
-          <div className="flex flex-wrap items-center gap-2">
-            {user ? (
-              <>
-                <div className="hidden rounded-2xl border border-slate-200 bg-slate-50 px-4 py-2 text-sm font-semibold text-slate-700 sm:block">
-                  {user.full_name}
-                </div>
-                <button type="button" onClick={logout} className="secondary-button py-2.5">
-                  Logout
-                </button>
-              </>
-            ) : (
-              <>
-                <Link to="/login" className="secondary-button py-2.5">
+            <div className="home-header-actions">
+              <ThemePanel compact />
+              {user ? (
+                <>
+                  <div className="home-user-chip" aria-label={`Signed in as ${displayName}`}>
+                    <span className="home-user-avatar" aria-hidden="true">
+                      {profilePhoto ? <img src={profilePhoto} alt="" /> : initials}
+                    </span>
+                    <span className="home-user-name">{displayName}</span>
+                  </div>
+                  <button type="button" onClick={() => {
+                    if (window.confirm("Are you sure you want to log out?")) {
+                      logout();
+                    }
+                  }} className="home-logout-button">
+                    Logout
+                  </button>
+                </>
+              ) : (
+                <>
+                  <Link to="/login" className="home-login-link">
+                    Login
+                  </Link>
+                  <Link to="/signup" className="home-logout-button home-signup-button">
+                    Create account
+                  </Link>
+                </>
+              )}
+              <button
+                type="button"
+                className="home-menu-button"
+                onClick={() => setIsMenuOpen((open) => !open)}
+                aria-expanded={isMenuOpen}
+                aria-controls="home-mobile-menu"
+                aria-label={isMenuOpen ? "Close navigation menu" : "Open navigation menu"}
+              >
+                {isMenuOpen ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
+              </button>
+            </div>
+          </div>
+
+          <nav
+            id="home-mobile-menu"
+            className={`home-mobile-menu ${isMenuOpen ? "open" : ""}`}
+            aria-label="Mobile menu"
+          >
+            {navItems.map((item) => (
+              <NavLink
+                key={item.label}
+                to={item.to}
+                className={`home-mobile-link ${isActiveItem(item) ? "active" : ""}`}
+                onClick={closeMenu}
+              >
+                {item.label}
+              </NavLink>
+            ))}
+            {!user && (
+              <div className="home-mobile-auth">
+                <Link to="/login" className="home-login-link" onClick={closeMenu}>
                   Login
                 </Link>
-                <Link to="/signup" className="primary-button py-2.5">
+                <Link to="/signup" className="home-logout-button home-signup-button" onClick={closeMenu}>
                   Create account
                 </Link>
-              </>
+              </div>
             )}
-          </div>
-        </div>
-      </header>
+          </nav>
+        </header>
 
-      <section id="how-it-works" className="card-panel overflow-hidden scroll-mt-28">
-        <div className="grid gap-8 lg:grid-cols-[1.2fr_0.8fr] lg:items-center">
-          <div>
-            <p className="font-mono text-sm font-bold uppercase tracking-[0.35em] text-tide">Next Step AI</p>
-            <h2 className="mt-4 max-w-3xl font-display text-4xl font-bold leading-tight text-slate-950 sm:text-6xl">
-              Navigate careers with live job data, skill intelligence, and personalized guidance.
-            </h2>
-            <p className="mt-6 max-w-2xl text-lg leading-8 text-slate-600">
-              This assistant helps students and job seekers discover real opportunities, understand exactly what skills are missing, and move from confusion to a focused action plan.
-            </p>
-            <div className="mt-8 flex flex-wrap gap-3">
-              <Link to="/signup" className="primary-button">
-                Launch your career workspace
-              </Link>
-              <Link to="/login" className="secondary-button">
-                Sign in
-              </Link>
+        <section id="how-it-works" className="home-hero scroll-mt-8">
+          <div className="home-hero-grid">
+            <div className="home-hero-copy">
+              <p className="home-eyebrow">Next Step AI</p>
+              <h1>
+                Navigate careers with live job data, skill intelligence, and personalized guidance.
+              </h1>
+              <p>
+                This assistant helps students and job seekers discover real opportunities, understand exactly what skills are missing, and move from confusion to a focused action plan.
+              </p>
+              <div className="mt-8 flex flex-wrap gap-3">
+                <Link to="/signup" className="primary-button">
+                  Launch your career workspace
+                </Link>
+                <Link to="/login" className="secondary-button">
+                  Sign in
+                </Link>
+              </div>
             </div>
-          </div>
-          <div className="space-y-4">
-            <div className="overflow-hidden rounded-[30px] border border-slate-200 bg-slate-50 shadow-[0_18px_45px_rgba(15,23,42,0.08)]">
-              <img
-                src="/images/career-hero-illustration.png"
-                alt="Illustration of an AI career assistant guiding a career path"
-                className="h-full min-h-[260px] w-full object-cover"
-              />
-            </div>
-            <div className="rounded-[30px] bg-slate-950 p-6 text-white">
-            <p className="font-mono text-xs uppercase tracking-[0.25em] text-coral">Built for momentum</p>
-            <div className="mt-6 grid gap-4">
-              {featureCards.map((feature) => (
-                <div key={feature} className="rounded-2xl border border-white/10 bg-white/5 p-4 text-sm leading-7 text-slate-100">
-                  {feature}
+            <div className="home-hero-media">
+              <div className="home-image-frame">
+                <img
+                  src="/images/career-hero-illustration.png"
+                  alt="Illustration of an AI career assistant guiding a career path"
+                  className="h-full w-full object-cover"
+                />
+              </div>
+              <div className="home-momentum-panel">
+                <p>Built for momentum</p>
+                <div className="mt-6 grid gap-4">
+                  {featureCards.map((feature) => (
+                    <div key={feature} className="home-momentum-item">
+                      {feature}
+                    </div>
+                  ))}
                 </div>
-              ))}
-            </div>
+              </div>
             </div>
           </div>
-        </div>
-      </section>
+        </section>
 
-      <section id="features" className="grid scroll-mt-28 gap-6 lg:grid-cols-3">
-        {[
-          { tag: "Job Matching", title: "AI Ranking", body: "TF-IDF and cosine similarity score each job to surface the strongest matches first." },
-          { tag: "Evaluation", title: "Readiness Score", body: "Skill match, experience fit, domain alignment, and relevance combine into a 0-100 score." },
-          { tag: "Guidance", title: "OpenAI Mentor", body: "Ask the mentor what to learn next, which role to target, and how to prepare for interviews." },
-        ].map((item) => (
-          <article key={item.title} className="card-panel">
-            <p className="font-mono text-xs uppercase tracking-[0.25em] text-tide">{item.tag}</p>
-            <h3 className="mt-3 font-display text-2xl font-bold text-slate-950">{item.title}</h3>
-            <p className="mt-4 text-sm leading-7 text-slate-600">{item.body}</p>
-          </article>
-        ))}
-      </section>
-    </div>
+        <section id="features" className="home-feature-grid scroll-mt-8">
+          {[
+            { tag: "Job Matching", title: "AI Ranking", body: "TF-IDF and cosine similarity score each job to surface the strongest matches first." },
+            { tag: "Evaluation", title: "Readiness Score", body: "Skill match, experience fit, domain alignment, and relevance combine into a 0-100 score." },
+            { tag: "Guidance", title: "OpenAI Mentor", body: "Ask the mentor what to learn next, which role to target, and how to prepare for interviews." },
+          ].map((item) => (
+            <article key={item.title} className="home-feature-card">
+              <p>{item.tag}</p>
+              <h2>{item.title}</h2>
+              <span>{item.body}</span>
+            </article>
+          ))}
+        </section>
+      </div>
+    </main>
   );
 }

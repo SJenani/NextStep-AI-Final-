@@ -1,9 +1,10 @@
 import { useEffect, useMemo, useState, useRef } from "react";
 import { NavLink } from "react-router-dom";
+import { Check } from "lucide-react";
 import client from "../api/client";
 import { useAuth } from "../context/AuthContext";
 import { ProfileSkeleton } from "../components/skeletons/PageSkeleton";
-import { getOpportunityModeMismatch } from "../utils/opportunityMode";
+import { getOpportunityModeMismatch, correctRoleSpelling } from "../utils/opportunityMode";
 import toast from "react-hot-toast";
 
 const emptyForm = {
@@ -277,7 +278,7 @@ export default function ProfilePage() {
   const skills = useMemo(() => splitSkills(form.skills), [form.skills]);
   const completion = useMemo(() => computeCompletion(form), [form]);
   const modeMismatchMessage = getOpportunityModeMismatch(form.mode, form.desired_role);
-  const targetLabel = form.desired_role?.trim() || `${form.domain || "Career"} ${form.mode || "path"}`;
+  const targetLabel = titleCase(form.desired_role?.trim() || `${form.domain || "Career"} ${form.mode || "path"}`);
 
   if (loading) {
     return <ProfileSkeleton />;
@@ -286,8 +287,11 @@ export default function ProfilePage() {
   const handleSubmit = async (event) => {
     event.preventDefault();
     setSaving(true);
+    const correctedRole = correctRoleSpelling(form.desired_role);
+    const updatedForm = { ...form, desired_role: correctedRole };
+    setForm(updatedForm);
     try {
-      await client.post("/profile/create", form);
+      await client.post("/profile/create", updatedForm);
       toast.success("Profile saved successfully.");
     } catch (error) {
       toast.error(error.response?.data?.detail || "Unable to save profile.");
@@ -321,6 +325,7 @@ export default function ProfilePage() {
       const nextPhoto = String(reader.result || "");
       setProfilePhoto(nextPhoto);
       localStorage.setItem(storageKey(user, "photo"), nextPhoto);
+      window.dispatchEvent(new Event("nextstep-profile-photo-updated"));
     };
     reader.readAsDataURL(file);
   };
@@ -364,7 +369,7 @@ export default function ProfilePage() {
           <div className="border-t border-slate-200 bg-[linear-gradient(180deg,#f8fafc,#ffffff)] p-6 sm:p-8 lg:border-l lg:border-t-0">
             <div className="flex items-center justify-between gap-4">
               <div>
-                <p className="text-xs font-semibold uppercase tracking-[0.22em] text-blue-700">Profile Strength</p>
+                <p className="text-xs font-semibold uppercase tracking-[0.22em] text-blue-700">Profile Completion</p>
                 <p className="mt-2 text-4xl font-bold tracking-[-0.05em] text-slate-950">{completion.score}%</p>
               </div>
               <svg className="h-20 w-20 -rotate-90" viewBox="0 0 100 100">
@@ -388,9 +393,11 @@ export default function ProfilePage() {
             </div>
             <div className="mt-5 grid gap-2 sm:grid-cols-2">
               {completion.checks.map((check) => (
-                <div key={check.label} className="flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm">
-                  <span className={`h-2.5 w-2.5 rounded-full ${check.done ? "bg-emerald-500" : "bg-slate-300"}`} />
-                  <span className={check.done ? "font-semibold text-slate-800" : "text-slate-500"}>{check.label}</span>
+                <div key={check.label} className={`profile-check-item ${check.done ? "complete" : ""}`}>
+                  <span className="profile-check-icon">
+                    {check.done ? <Check size={14} strokeWidth={3} /> : null}
+                  </span>
+                  <span>{check.label}</span>
                 </div>
               ))}
             </div>
@@ -420,9 +427,10 @@ export default function ProfilePage() {
           <div className="mt-7 grid gap-5 lg:grid-cols-2">
             <Field label="Desired role" className="lg:col-span-2">
               <input
-                className="field-input"
+                className="field-input capitalize"
                 value={form.desired_role}
                 onChange={(e) => setForm({ ...form, desired_role: e.target.value })}
+                onBlur={(e) => setForm({ ...form, desired_role: correctRoleSpelling(e.target.value) })}
                 placeholder="Backend Developer, Data Analyst, Marketing Associate"
               />
             </Field>

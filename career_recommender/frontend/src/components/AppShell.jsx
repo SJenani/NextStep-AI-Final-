@@ -1,85 +1,203 @@
+import { useEffect, useMemo, useRef, useState } from "react";
 import { NavLink, useLocation } from "react-router-dom";
+import {
+  Bot,
+  Bookmark,
+  ChevronDown,
+  FileText,
+  LayoutDashboard,
+  Lightbulb,
+  LogOut,
+  Map,
+  Sparkles,
+  User,
+} from "lucide-react";
 import { useAuth } from "../context/AuthContext";
+import ThemePanel from "./ThemePanel";
 
-const publicNavItems = [{ label: "Home", to: "/" }];
+const publicNavItems = [{ label: "Dashboard", to: "/", Icon: LayoutDashboard }];
 const privateNavItems = [
-  { label: "Home", to: "/" },
-  { label: "Profile", to: "/profile" },
-  { label: "Dashboard", to: "/dashboard" },
-  { label: "Recommendations", to: "/recommendations" },
-  { label: "Roadmap", to: "/roadmap" },
-  { label: "Resume", to: "/resume" },
-  { label: "Bookmarks", to: "/bookmarks" },
-  { label: "AI Mentor", to: "/chatbot" },
+  { label: "Dashboard", to: "/dashboard", Icon: LayoutDashboard },
+  { label: "Profile", to: "/profile", Icon: User },
+  { label: "Recommendations", to: "/recommendations", Icon: Sparkles },
+  { label: "Skill Gap", to: "/skill-gap", Icon: Lightbulb },
+  { label: "Roadmap", to: "/roadmap", Icon: Map },
+  { label: "Resume", to: "/resume", Icon: FileText },
+  { label: "Bookmarks", to: "/bookmarks", Icon: Bookmark },
+  { label: "AI Mentor", to: "/chatbot", Icon: Bot },
 ];
+
+function profileStorageKey(user, key) {
+  return `career_profile_${user?.id || user?.email || "local"}_${key}`;
+}
 
 export default function AppShell({ children }) {
   const { user, logout = () => {} } = useAuth() || {};
   const location = useLocation();
+  const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(() => {
+    if (typeof window === "undefined") return false;
+    return window.localStorage.getItem("nextstep-sidebar-collapsed") === "true";
+  });
+  const [isProfileOpen, setIsProfileOpen] = useState(false);
+  const [profilePhoto, setProfilePhoto] = useState("");
+  const profileRef = useRef(null);
   const navItems = user ? privateNavItems : publicNavItems;
-  const shellWidthClass = user ? "mx-auto w-[90vw] max-w-none px-3 sm:px-5 lg:px-6 pt-4 pb-2" : "mx-auto w-full max-w-7xl px-3 sm:px-5 lg:px-6 pt-4 pb-2";
+  const shellWidthClass = user ? "mx-auto w-full max-w-none px-3 sm:px-5 lg:px-6 pb-2" : "mx-auto w-full max-w-7xl px-3 sm:px-5 lg:px-6 pb-2";
+  const displayName = user?.full_name || user?.email?.split("@")[0] || "Guest";
+  const initials = displayName
+    .split(" ")
+    .filter(Boolean)
+    .slice(0, 2)
+    .map((part) => part[0]?.toUpperCase())
+    .join("") || "AI";
+  const currentPageTitle = useMemo(() => {
+    const item = navItems.find((navItem) => {
+      return location.pathname === navItem.to;
+    });
+    return item?.label || "Dashboard";
+  }, [location.pathname, navItems]);
+  const isNavItemActive = (to) => {
+    return location.pathname === to;
+  };
+
+  useEffect(() => {
+    window.localStorage.setItem("nextstep-sidebar-collapsed", String(isSidebarCollapsed));
+  }, [isSidebarCollapsed]);
+
+  useEffect(() => {
+    const loadProfilePhoto = () => {
+      setProfilePhoto(window.localStorage.getItem(profileStorageKey(user, "photo")) || "");
+    };
+
+    loadProfilePhoto();
+    window.addEventListener("focus", loadProfilePhoto);
+    window.addEventListener("storage", loadProfilePhoto);
+    window.addEventListener("nextstep-profile-photo-updated", loadProfilePhoto);
+
+    return () => {
+      window.removeEventListener("focus", loadProfilePhoto);
+      window.removeEventListener("storage", loadProfilePhoto);
+      window.removeEventListener("nextstep-profile-photo-updated", loadProfilePhoto);
+    };
+  }, [user]);
+
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (profileRef.current && !profileRef.current.contains(event.target)) {
+        setIsProfileOpen(false);
+      }
+    };
+
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
 
   return (
-    <div className="min-h-screen bg-slate-50">
-      <div className={shellWidthClass}>
-        <header className="mb-6 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
-          <div className="flex flex-col gap-4">
-            <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
-              <div>
-                <p className="text-xs font-semibold uppercase tracking-[0.28em] text-slate-500">Next Step AI</p>
-                <h1 className="text-xl font-bold text-slate-900 sm:text-2xl">Smart Career Guidance</h1>
-              </div>
-              <div className="flex flex-wrap items-center gap-2">
-                {user ? (
-                  <button type="button" onClick={logout} className="secondary-button">
-                    Logout
-                  </button>
-                ) : (
-                  <>
-                    <NavLink to="/login" className="secondary-button">
-                      Login
-                    </NavLink>
-                    <NavLink to="/signup" className="primary-button">
-                      Create account
-                    </NavLink>
-                  </>
-                )}
-              </div>
-            </div>
+    <div className={`shell-layout ${isSidebarCollapsed ? "is-collapsed" : "is-expanded"}`}>
+      <aside className="shell-sidebar print:hidden" aria-label="Primary navigation">
+        <div className="shell-sidebar-brand-row">
+          <NavLink to="/" className="shell-sidebar-brand" title={isSidebarCollapsed ? "Next Step AI" : undefined}>
+            <span className="shell-logo-mark" aria-hidden="true">
+              <img src="/images/next-step-ai-logo.png" alt="" />
+            </span>
+            <span className="shell-sidebar-brand-copy">
+              <span className="shell-brand-kicker">Next Step AI</span>
+            </span>
+          </NavLink>
+          <button
+            type="button"
+            className="shell-sidebar-toggle"
+            onClick={() => setIsSidebarCollapsed((collapsed) => !collapsed)}
+            aria-label={isSidebarCollapsed ? "Open navigation" : "Close navigation"}
+            aria-pressed={!isSidebarCollapsed}
+            title={isSidebarCollapsed ? "Open navigation" : "Close navigation"}
+          >
+            <span className="shell-sidebar-toggle-lines" aria-hidden="true">
+              <span />
+              <span />
+              <span />
+            </span>
+          </button>
+        </div>
 
-            <div className="flex flex-wrap gap-2">
-              {navItems.map((item) => (
-                <NavLink
-                  key={item.to}
-                  to={item.to}
-                  className={({ isActive }) =>
-                    `rounded-xl border px-3 py-2 text-sm font-semibold transition ${
-                      isActive
-                        ? "border-slate-900 bg-slate-900 text-white"
-                        : "border-slate-300 bg-white text-slate-700 hover:border-slate-400 hover:bg-slate-50"
-                    }`
-                  }
-                >
-                  {item.label}
+        <nav className="shell-sidebar-nav" aria-label="Main menu">
+          {navItems.map(({ label, to, Icon }) => (
+            <NavLink
+              key={`${label}-${to}`}
+              to={to}
+              title={isSidebarCollapsed ? label : undefined}
+              className={`shell-sidebar-link ${isNavItemActive(to) ? "active" : ""}`}
+            >
+              <Icon className="h-5 w-5" aria-hidden="true" />
+              <span className="shell-sidebar-label">{label}</span>
+              <span className="shell-sidebar-tooltip" role="tooltip">{label}</span>
+            </NavLink>
+          ))}
+        </nav>
+
+        <div className="shell-sidebar-footer">
+          {user ? (
+            <div className="shell-profile-menu" ref={profileRef}>
+              <button
+                type="button"
+                className="shell-profile-trigger"
+                onClick={() => setIsProfileOpen((open) => !open)}
+                aria-expanded={isProfileOpen}
+                aria-haspopup="menu"
+                title={isSidebarCollapsed ? displayName : undefined}
+              >
+                <span className="shell-user-avatar" aria-hidden="true">
+                  {profilePhoto ? <img src={profilePhoto} alt="" /> : initials}
+                </span>
+                <span className="shell-user-name">{displayName}</span>
+                <ChevronDown className="h-4 w-4 shell-profile-chevron" aria-hidden="true" />
+              </button>
+              <div className={`shell-profile-dropdown ${isProfileOpen ? "open" : ""}`} role="menu">
+                <div className="shell-profile-summary">
+                  <span className="shell-user-avatar" aria-hidden="true">
+                    {profilePhoto ? <img src={profilePhoto} alt="" /> : initials}
+                  </span>
+                  <span>
+                    <strong>{displayName}</strong>
+                    <small>{user.email}</small>
+                  </span>
+                </div>
+                <NavLink to="/profile" className="shell-dropdown-item" role="menuitem" onClick={() => setIsProfileOpen(false)}>
+                  <User className="h-4 w-4" aria-hidden="true" />
+                  Profile
                 </NavLink>
-              ))}
+                <button type="button" className="shell-dropdown-item danger" onClick={() => {
+                  if (window.confirm("Are you sure you want to log out?")) {
+                    logout();
+                  }
+                }} role="menuitem">
+                  <LogOut className="h-4 w-4" aria-hidden="true" />
+                  Logout
+                </button>
+              </div>
             </div>
+          ) : (
+            <NavLink to="/login" className="shell-login-link">
+              Login
+            </NavLink>
+          )}
+        </div>
+      </aside>
+
+      <div className="shell-workspace">
+        <header className="shell-topbar print:hidden">
+          <div className="shell-topbar-left">
+            <h1 className="shell-page-title">{currentPageTitle}</h1>
+          </div>
+
+          <div className="shell-topbar-actions">
+            <ThemePanel compact />
           </div>
         </header>
 
-        {user && (
-          <div className="mb-6 rounded-2xl border border-slate-200 bg-white px-4 py-3 text-slate-900 shadow-sm">
-            <div className="flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between">
-              <div>
-                <span className="font-semibold">{user.full_name}</span>
-                <span className="ml-0 block text-sm text-slate-500 sm:ml-3 sm:inline">{user.email}</span>
-              </div>
-              <p className="text-sm text-slate-500">Close skill gaps, rank live jobs, and plan your next move.</p>
-            </div>
-          </div>
-        )}
-
-        <main>{children}</main>
+        <div className={`${shellWidthClass} shell-content-frame`}>
+          <main>{children}</main>
+        </div>
       </div>
     </div>
   );

@@ -1,7 +1,7 @@
 import axios from "axios";
 
 const client = axios.create({
-baseURL: import.meta.env.VITE_API_BASE_URL || "http://127.0.0.1:8000",
+  baseURL: import.meta.env.VITE_API_BASE_URL || "http://127.0.0.1:8000",
 });
 
 client.interceptors.request.use((config) => {
@@ -11,6 +11,20 @@ client.interceptors.request.use((config) => {
   }
   return config;
 });
+
+client.interceptors.response.use(
+  (response) => response,
+  (error) => {
+    if (error.response && error.response.status === 401) {
+      const isLoginRequest = error.config && error.config.url === "/auth/login";
+      localStorage.removeItem("career_token");
+      if (typeof window !== "undefined" && !isLoginRequest && window.location.pathname !== "/login") {
+        window.location.href = "/login";
+      }
+    }
+    return Promise.reject(error);
+  }
+);
 
 export default client;
 
@@ -22,8 +36,8 @@ export function getApiErrorMessage(error, fallback = "Something went wrong.") {
       : detail;
   }
 
-  if (error.request) {
-return "Cannot reach the backend server. Start FastAPI on http://127.0.0.1:8000 and try again.";
+  if (error.request && !error.response) {
+    return "Cannot reach the backend server. Start FastAPI on http://127.0.0.1:8000 and try again.";
   }
 
   return error.message || fallback;

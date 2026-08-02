@@ -3,6 +3,7 @@ import { useNavigate } from "react-router-dom";
 import client from "../api/client";
 import RoadmapTimeline from "../components/RoadmapTimeline";
 import ScrollToTopButton from "../components/ScrollToTopButton";
+import { correctRoleSpelling } from "../utils/opportunityMode";
 
 const API_BASE_URL = (import.meta.env.VITE_API_BASE_URL || "http://127.0.0.1:8000").replace(/\/$/, "");
 function buildAbsoluteMediaUrl(path) {
@@ -143,7 +144,7 @@ function SummaryCard({ label, value, detail, tone = "slate" }) {
     <article className={`overflow-hidden rounded-[24px] border p-5 shadow-[0_12px_28px_rgba(15,23,42,0.06)] ${selected.panel}`}>
       <p className={`text-xs font-semibold uppercase tracking-[0.22em] ${selected.eyebrow}`}>{label}</p>
       <p className={`mt-3 text-[2.2rem] font-bold tracking-[-0.05em] ${selected.metric}`}>{value}</p>
-      {detail && <p className={`mt-2 text-sm leading-6 ${selected.detail}`}>{detail}</p>}
+      {detail && <p className={`mt-2 text-sm leading-6 capitalize ${selected.detail}`}>{detail}</p>}
       <div className="mt-4 h-2 overflow-hidden rounded-full bg-slate-100">
         <div className={`h-full w-[54%] rounded-full ${selected.accent}`} />
       </div>
@@ -151,7 +152,7 @@ function SummaryCard({ label, value, detail, tone = "slate" }) {
   );
 }
 
-function ActionBar({ onPrint, onCopy }) {
+function ActionBar({ onPrint, onCopy, onExport }) {
   const [copied, setCopied] = useState(false);
 
   const handleCopy = () => {
@@ -173,7 +174,7 @@ function ActionBar({ onPrint, onCopy }) {
             d="M6.72 13.829c-.24.03-.48.062-.72.096m.72-.096a42.415 42.415 0 0110.56 0m-10.56 0L6.34 18m10.94-4.171c.24.03.48.062.72.096m-.72-.096L17.66 18m0 0l.229 2.523a1.125 1.125 0 01-1.12 1.227H7.231c-.662 0-1.18-.568-1.12-1.227L6.34 18m11.318 0h1.091A2.25 2.25 0 0021 15.75V9.456c0-1.081-.768-2.015-1.837-2.175a48.055 48.055 0 00-1.913-.247M6.34 18H5.25A2.25 2.25 0 013 15.75V9.456c0-1.081.768-2.015 1.837-2.175a48.041 48.041 0 011.913-.247m10.5 0a48.536 48.536 0 00-10.5 0m10.5 0V3.375c0-.621-.504-1.125-1.125-1.125h-8.25c-.621 0-1.125.504-1.125 1.125v3.659M18 10.5h.008v.008H18V10.5zm-3 0h.008v.008H15V10.5z"
           />
         </svg>
-        Print Roadmap
+        Print PDF
       </button>
       <button
         onClick={handleCopy}
@@ -188,6 +189,14 @@ function ActionBar({ onPrint, onCopy }) {
         </svg>
         {copied ? "Copied!" : "Copy Summary"}
       </button>
+      {onExport && (
+        <button
+          onClick={() => onExport("markdown")}
+          className="inline-flex items-center gap-2 rounded-2xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-semibold text-slate-900 shadow-[0_8px_22px_rgba(15,23,42,0.05)] transition hover:border-slate-300 hover:bg-slate-50"
+        >
+          Export MD
+        </button>
+      )}
     </div>
   );
 }
@@ -463,12 +472,13 @@ function MockInterviewFocusOverlay({
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/75 p-4 backdrop-blur-sm print:hidden">
-      <div className="max-h-[90vh] w-full max-w-5xl overflow-y-auto rounded-[32px] border border-slate-200 bg-white shadow-[0_30px_100px_rgba(15,23,42,0.3)]">
+      <div className="relative w-full max-w-5xl rounded-[32px] overflow-hidden border border-slate-200 bg-white shadow-[0_30px_100px_rgba(15,23,42,0.3)]">
+        <div className="max-h-[90vh] w-full overflow-y-auto">
         <div className="border-b border-slate-200 bg-gradient-to-r from-slate-950 via-slate-900 to-night p-6 text-white">
           <div className="flex flex-wrap items-start justify-between gap-4">
             <div className="max-w-3xl">
               <p className="font-mono text-xs uppercase tracking-[0.25em] text-amber-200">Focus Mode</p>
-              <h3 className="mt-3 text-3xl font-bold">{targetRole}</h3>
+              <h3 className="mt-3 text-3xl font-bold capitalize">{targetRole}</h3>
               <p className="mt-2 text-sm font-semibold text-blue-100">
                 {prompt.type === "technical" ? "Technical question" : "HR question"} {prompt.index + 1}
               </p>
@@ -615,6 +625,7 @@ function MockInterviewFocusOverlay({
           </div>
         </div>
       </div>
+      </div>
     </div>
   );
 }
@@ -659,14 +670,14 @@ function InterviewQuestionColumn({
 
   return (
     <div className={`card-panel flex flex-col overflow-hidden print:border-0 print:shadow-none print:p-0 ${panelClassName}`}>
-      <div className="flex h-full flex-col rounded-[28px] border border-slate-200 bg-white p-5 shadow-sm">
+      <div className="flex h-full flex-col rounded-[28px] border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 p-5 shadow-sm">
         <div className="flex flex-wrap items-start justify-between gap-4">
           <div className="flex items-start gap-4">
             <div className={`flex h-12 w-12 items-center justify-center rounded-2xl ${iconClassName}`}>{icon}</div>
             <div>
-              <p className="font-mono text-xs uppercase tracking-[0.25em] text-slate-500">{eyebrow}</p>
-              <h3 className="mt-2 text-2xl font-bold text-slate-950">{title}</h3>
-              <p className="mt-2 max-w-xl text-sm leading-6 text-slate-600">{description}</p>
+              <p className="font-mono text-xs uppercase tracking-[0.25em] text-slate-500 dark:text-slate-400">{eyebrow}</p>
+              <h3 className="mt-2 text-2xl font-bold text-slate-950 dark:text-slate-100">{title}</h3>
+              <p className="mt-2 max-w-xl text-sm leading-6 text-slate-600 dark:text-slate-400">{description}</p>
             </div>
           </div>
           <div className={`rounded-full px-3 py-1 text-xs font-semibold uppercase tracking-[0.18em] ${chipClassName}`}>
@@ -674,11 +685,11 @@ function InterviewQuestionColumn({
           </div>
         </div>
 
-        <div className="mt-5 rounded-2xl border border-slate-200 bg-white/90 p-4">
-          <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">{frameworkTitle}</p>
+        <div className="mt-5 rounded-2xl border border-slate-200 dark:border-slate-800 bg-white/90 dark:bg-slate-800/50 p-4">
+          <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500 dark:text-slate-400">{frameworkTitle}</p>
           <div className="mt-3 flex flex-wrap gap-2">
             {frameworkSteps.map((step) => (
-              <span key={step} className="accent-chip border-slate-200 bg-slate-50 text-slate-800">
+              <span key={step} className="accent-chip border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900 text-slate-800 dark:text-slate-300">
                 {step}
               </span>
             ))}
@@ -699,7 +710,7 @@ function InterviewQuestionColumn({
             const summary = buildPracticeSummary(type, noteValue, ratingValue, isPracticed);
 
             return (
-              <div key={`${title}-${index}`} className={`rounded-2xl border p-4 transition hover:shadow-sm ${itemClassName} ${isExpanded ? "ring-1 ring-slate-200" : ""}`}>
+              <div key={`${title}-${index}`} className={`rounded-2xl border dark:border-slate-800 p-4 transition hover:shadow-sm ${itemClassName} ${isExpanded ? "ring-1 ring-slate-200 dark:ring-slate-700" : ""}`}>
                 <button
                   type="button"
                   onClick={() => onToggleExpand(type, index)}
@@ -724,9 +735,9 @@ function InterviewQuestionColumn({
                         </span>
                       )}
                     </div>
-                    <p className="mt-1.5 text-sm leading-7 text-slate-800">{question}</p>
+                    <p className="mt-1.5 text-sm leading-7 text-slate-800 dark:text-slate-200">{question}</p>
                   </div>
-                  <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-slate-100 text-slate-500 transition hover:bg-slate-200">
+                  <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400 transition hover:bg-slate-200 dark:hover:bg-slate-700">
                     <svg
                       className={`h-4 w-4 transition-transform duration-200 ${isExpanded ? "rotate-180" : ""}`}
                       fill="none"
@@ -740,17 +751,17 @@ function InterviewQuestionColumn({
                 </button>
 
                 {isExpanded && (
-                  <div className="mt-5 border-t border-slate-200 pt-5">
+                  <div className="mt-5 border-t border-slate-200 dark:border-slate-800 pt-5">
                     <div className="space-y-5">
-                      <div className="rounded-[26px] border border-slate-200 bg-gradient-to-br from-slate-50 via-white to-slate-50/60 p-5">
+                      <div className="rounded-[26px] border border-slate-200 dark:border-slate-800 bg-gradient-to-br from-slate-50 via-white to-slate-50/60 dark:from-slate-800/50 dark:via-slate-800/30 dark:to-slate-900/50 p-5">
                         <div className="flex flex-wrap items-start justify-between gap-3">
                           <div>
-                            <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">Answer blueprint</p>
-                            <p className="mt-2 text-sm leading-6 text-slate-600">
+                            <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500 dark:text-slate-400">Answer blueprint</p>
+                            <p className="mt-2 text-sm leading-6 text-slate-600 dark:text-slate-400">
                               Use this structure to keep the answer tight, credible, and easy to follow.
                             </p>
                           </div>
-                          <div className={`rounded-full px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.16em] ${isPracticed ? "bg-emerald-100 text-emerald-900" : "bg-slate-200 text-slate-700"}`}>
+                          <div className={`rounded-full px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.16em] ${isPracticed ? "bg-emerald-100 dark:bg-emerald-900/40 text-emerald-900 dark:text-emerald-300" : "bg-slate-200 dark:bg-slate-700 text-slate-700 dark:text-slate-300"}`}>
                             {isPracticed ? "Practiced" : "In progress"}
                           </div>
                         </div>
@@ -759,12 +770,12 @@ function InterviewQuestionColumn({
                           {answerCues.map((cue, i) => (
                             <div
                               key={`${type}-${index}-${cue}`}
-                              className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm shadow-slate-100/70"
+                              className="rounded-2xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 p-4 shadow-sm shadow-slate-100/70 dark:shadow-none"
                             >
                               <div className={`flex h-7 w-7 items-center justify-center rounded-full text-xs font-bold ${numberClassName}`}>
                                 {i + 1}
                               </div>
-                              <p className="mt-3 text-sm leading-6 text-slate-700">{cue}</p>
+                              <p className="mt-3 text-sm leading-6 text-slate-700 dark:text-slate-300">{cue}</p>
                             </div>
                           ))}
                         </div>
@@ -985,7 +996,7 @@ function InterviewResourcesPanel({
             </div>
             <div>
               <p className="font-mono text-xs uppercase tracking-[0.25em] text-slate-500">Preparation Resources</p>
-              <h3 className="mt-2 text-2xl font-bold text-slate-950">{targetRole || interviewPack.job_role}</h3>
+              <h3 className="mt-2 text-2xl font-bold text-slate-950 capitalize">{targetRole || interviewPack.job_role}</h3>
               <p className="mt-2 max-w-xl text-sm leading-6 text-slate-600">
                 Use this panel as your fast revision stack before mock interviews, HR rounds, and technical screening calls.
               </p>
@@ -1205,6 +1216,22 @@ function InterviewPrepSection({ interviewPack, targetRole }) {
   const [mockFocusOpen, setMockFocusOpen] = useState(false);
   const recordingsRef = useRef({});
 
+  // Practice Analytics States
+  const [analytics, setAnalytics] = useState(null);
+
+  const fetchAnalytics = async () => {
+    try {
+      const { data } = await client.get("/roadmap/analytics");
+      setAnalytics(data);
+    } catch {
+      // ignore
+    }
+  };
+
+  useEffect(() => {
+    fetchAnalytics();
+  }, [resolvedTargetRole]);
+
   useEffect(() => {
     recordingsRef.current = recordingsMap;
   }, [recordingsMap]);
@@ -1349,9 +1376,25 @@ function InterviewPrepSection({ interviewPack, targetRole }) {
     setExpandedMap((current) => ({ ...current, [key]: !current[key] }));
   };
 
-  const togglePracticed = (type, index) => {
+  const togglePracticed = async (type, index) => {
     const key = `${type}-${index}`;
-    setPracticedMap((current) => ({ ...current, [key]: !current[key] }));
+    const nextVal = !practicedMap[key];
+    setPracticedMap((current) => ({ ...current, [key]: nextVal }));
+
+    if (nextVal) {
+      try {
+        const ratingVal = ratingsMap[key] || 4;
+        await client.post("/roadmap/save-practice", {
+          technical_score: type === "technical" ? ratingVal * 20 : 0,
+          hr_score: type === "hr" ? ratingVal * 20 : 0,
+          confidence_score: 85,
+          response_time: 12.5,
+          questions_count: 1,
+          correct_count: ratingVal >= 3 ? 1 : 0
+        });
+        fetchAnalytics();
+      } catch {}
+    }
   };
 
   const updateNote = (type, index, value) => {
@@ -1359,9 +1402,21 @@ function InterviewPrepSection({ interviewPack, targetRole }) {
     setNotesMap((current) => ({ ...current, [key]: value }));
   };
 
-  const updateRating = (type, index, value) => {
+  const updateRating = async (type, index, value) => {
     const key = `${type}-${index}`;
     setRatingsMap((current) => ({ ...current, [key]: value }));
+
+    try {
+      await client.post("/roadmap/save-practice", {
+        technical_score: type === "technical" ? value * 20 : 0,
+        hr_score: type === "hr" ? value * 20 : 0,
+        confidence_score: 85,
+        response_time: 12.5,
+        questions_count: 1,
+        correct_count: value >= 3 ? 1 : 0
+      });
+      fetchAnalytics();
+    } catch {}
   };
 
   const startMock = (type, index, question) => {
@@ -1643,13 +1698,60 @@ function InterviewPrepSection({ interviewPack, targetRole }) {
 
   return (
     <section className="space-y-6 print:space-y-4">
+      {/* PRACTICE ANALYTICS PANEL */}
+      <div className="card-panel overflow-hidden border-slate-200 bg-white shadow-[0_18px_40px_rgba(15,23,42,0.06)] print:hidden text-slate-800">
+        <p className="font-mono text-xs uppercase tracking-[0.25em] text-blue-600">Practice Analytics Dashboard</p>
+        <h3 className="mt-3 text-2xl font-bold text-slate-950">Your Rehearsal Performance</h3>
+        
+        <div className="grid gap-4 mt-6 sm:grid-cols-2 lg:grid-cols-4">
+          <div className="rounded-2xl border border-slate-100 bg-slate-50 p-4">
+            <span className="text-xs text-slate-500 uppercase font-semibold">Technical Score</span>
+            <span className="block mt-2 text-2xl font-bold text-slate-900">{analytics?.technical_score ? `${Math.round(analytics.technical_score)}%` : "0%"}</span>
+          </div>
+          <div className="rounded-2xl border border-slate-100 bg-slate-50 p-4">
+            <span className="text-xs text-slate-500 uppercase font-semibold">HR Score</span>
+            <span className="block mt-2 text-2xl font-bold text-slate-900">{analytics?.hr_score ? `${Math.round(analytics.hr_score)}%` : "0%"}</span>
+          </div>
+          <div className="rounded-2xl border border-slate-100 bg-slate-50 p-4">
+            <span className="text-xs text-slate-500 uppercase font-semibold">Confidence Level</span>
+            <span className="block mt-2 text-2xl font-bold text-slate-900">{analytics?.confidence_score ? `${Math.round(analytics.confidence_score)}%` : "0%"}</span>
+          </div>
+          <div className="rounded-2xl border border-slate-100 bg-slate-50 p-4">
+            <span className="text-xs text-slate-500 uppercase font-semibold">Avg Response Time</span>
+            <span className="block mt-2 text-2xl font-bold text-slate-900">{analytics?.response_time ? `${analytics.response_time.toFixed(1)}s` : "0.0s"}</span>
+          </div>
+        </div>
+
+        {/* Practice History chart */}
+        <div className="mt-6 bg-slate-50 border border-slate-200 rounded-2xl p-4">
+          <p className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Practice History Trend</p>
+          <div className="h-32 w-full flex items-end justify-between gap-2 pt-4 px-2 border-b border-slate-200">
+            {analytics?.history?.length > 0 ? (
+              analytics.history.map((session, idx) => (
+                <div key={idx} className="flex-1 flex flex-col items-center gap-1.5 h-full justify-end">
+                  <div className="w-8 bg-blue-500 hover:bg-blue-600 rounded-t transition-all duration-300" style={{ height: `${Math.max(10, session.technical_score || session.hr_score || 50)}%` }} />
+                  <span className="text-[9px] text-slate-400 font-mono">Session {idx + 1}</span>
+                </div>
+              ))
+            ) : (
+              [60, 68, 75, 82, 88].map((val, idx) => (
+                <div key={idx} className="flex-1 flex flex-col items-center gap-1.5 h-full justify-end">
+                  <div className="w-8 bg-slate-300/80 rounded-t" style={{ height: `${val}%` }} />
+                  <span className="text-[9px] text-slate-400 font-mono">Mock {idx + 1}</span>
+                </div>
+              ))
+            )}
+          </div>
+        </div>
+      </div>
+
       <div className="card-panel overflow-hidden border-slate-800 bg-gradient-to-r from-slate-950 via-slate-900 to-night text-white print:border-0 print:shadow-none print:p-0">
         <div className="bg-[radial-gradient(circle_at_top_left,rgba(251,146,60,0.42),transparent_28%),radial-gradient(circle_at_80%_20%,rgba(59,130,246,0.28),transparent_24%)] p-6">
           <div className="rounded-[30px] border border-white/10 bg-black/10 p-6 backdrop-blur-sm">
           <div className="flex flex-col gap-6 xl:flex-row xl:items-end xl:justify-between">
             <div className="max-w-3xl">
               <p className="font-mono text-xs uppercase tracking-[0.25em] text-amber-200">Interview Prep Board</p>
-              <h2 className="mt-3 text-3xl font-bold text-white sm:text-4xl">{targetRole || interviewPack.job_role}</h2>
+              <h2 className="mt-3 text-3xl font-bold text-white sm:text-4xl capitalize">{targetRole || interviewPack.job_role}</h2>
               <p className="mt-3 text-sm leading-7 text-slate-100">
                 A cleaner prep experience for technical and HR rounds. Review the likely prompts, rehearse with a structure,
                 and use the resource stack on the right before applying or scheduling mocks.
@@ -1702,11 +1804,11 @@ function InterviewPrepSection({ interviewPack, targetRole }) {
           eyebrow="Technical Questions"
           title="Prove how you build and think"
           description="These prompts are strongest when you answer with concrete project evidence, design choices, and debugging judgment."
-          iconClassName="bg-blue-100 text-blue-700"
-          chipClassName="bg-blue-100 text-blue-900"
-          panelClassName="bg-gradient-to-b from-blue-50 via-white to-white"
-          itemClassName="border-blue-100 bg-white hover:border-blue-200"
-          numberClassName="bg-blue-100 text-blue-800"
+          iconClassName="bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-300"
+          chipClassName="bg-blue-100 text-blue-900 dark:bg-blue-900/40 dark:text-blue-300"
+          panelClassName="bg-gradient-to-b from-blue-50 via-white to-white dark:from-slate-900/50 dark:via-slate-900/50 dark:to-slate-900/50"
+          itemClassName="border-blue-100 bg-white hover:border-blue-200 dark:border-slate-800 dark:bg-slate-900 dark:hover:border-slate-700"
+          numberClassName="bg-blue-100 text-blue-800 dark:bg-blue-900/40 dark:text-blue-300"
           questionItems={technicalItems}
           focusAreas={TECHNICAL_FOCUS_AREAS}
           frameworkTitle="Best answer structure"
@@ -1743,11 +1845,11 @@ function InterviewPrepSection({ interviewPack, targetRole }) {
           eyebrow="HR Questions"
           title="Show maturity and role fit"
           description="These are better when they sound calm, specific, and reflective. Focus on motivation, collaboration, and how you learn."
-          iconClassName="bg-emerald-100 text-emerald-700"
-          chipClassName="bg-emerald-100 text-emerald-900"
-          panelClassName="bg-gradient-to-b from-emerald-50 via-white to-white"
-          itemClassName="border-emerald-100 bg-white hover:border-emerald-200"
-          numberClassName="bg-emerald-100 text-emerald-800"
+          iconClassName="bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300"
+          chipClassName="bg-emerald-100 text-emerald-900 dark:bg-emerald-900/40 dark:text-emerald-300"
+          panelClassName="bg-gradient-to-b from-emerald-50 via-white to-white dark:from-slate-900/50 dark:via-slate-900/50 dark:to-slate-900/50"
+          itemClassName="border-emerald-100 bg-white hover:border-emerald-200 dark:border-slate-800 dark:bg-slate-900 dark:hover:border-slate-700"
+          numberClassName="bg-emerald-100 text-emerald-800 dark:bg-emerald-900/40 dark:text-emerald-300"
           questionItems={hrItems}
           focusAreas={HR_FOCUS_AREAS}
           frameworkTitle="Best answer structure"
@@ -1863,6 +1965,143 @@ export default function RoadmapPage() {
   const [initialLoading, setInitialLoading] = useState(true);
   const [needsProfile, setNeedsProfile] = useState(false);
 
+  // Enhancement States
+  const [progressData, setProgressData] = useState(null);
+  const [mentorSuggestion, setMentorSuggestion] = useState(null);
+  const [achievements, setAchievements] = useState([]);
+  const [companies, setCompanies] = useState([]);
+  const [exporting, setExporting] = useState(false);
+
+  const fetchProgress = async () => {
+    try {
+      const { data } = await client.get("/roadmap/progress");
+      setProgressData(data);
+    } catch {
+      // ignore
+    }
+  };
+
+  const fetchMentorSuggestion = async () => {
+    try {
+      const { data } = await client.get("/roadmap/mentor-suggestion");
+      setMentorSuggestion(data);
+    } catch {
+      // ignore
+    }
+  };
+
+  const fetchAchievements = async () => {
+    try {
+      const { data } = await client.get("/roadmap/achievements");
+      setAchievements(data.badges || []);
+    } catch {
+      // ignore
+    }
+  };
+
+  const fetchCompanies = async () => {
+    try {
+      const { data } = await client.get("/roadmap/company-recommendations");
+      setCompanies(data || []);
+    } catch {
+      // ignore
+    }
+  };
+
+  const handleToggleMilestone = async (stepId, completed) => {
+    try {
+      const { data } = await client.post("/roadmap/update-milestone", { step_id: stepId, completed });
+      setProgressData(data);
+      fetchAchievements();
+    } catch {
+      // ignore
+    }
+  };
+
+  const handleUpdateProject = async (projectId, projectPayload) => {
+    try {
+      const { data } = await client.post("/roadmap/update-project", {
+        project_id: projectId,
+        status: projectPayload.status,
+        repo: projectPayload.repo,
+        demo: projectPayload.demo,
+        notes: projectPayload.notes,
+        completed_date: projectPayload.completed_date
+      });
+      setProgressData(data);
+      fetchAchievements();
+    } catch {
+      // ignore
+    }
+  };
+
+  const handleUpdateResource = async (resourceId, resourcePayload) => {
+    try {
+      const { data } = await client.post("/roadmap/update-resource", {
+        resource_id: resourceId,
+        started_date: resourcePayload.started_date,
+        completed_date: resourcePayload.completed_date,
+        time_spent: resourcePayload.time_spent,
+        percent: resourcePayload.percent
+      });
+      setProgressData(data);
+      fetchAchievements();
+    } catch {
+      // ignore
+    }
+  };
+
+  const handleAnalyzeProject = async (projectId, projectPayload) => {
+    const { data } = await client.post("/roadmap/analyze-project", {
+      project_id: projectId,
+      status: projectPayload.status,
+      repo: projectPayload.repo,
+      demo: projectPayload.demo,
+      notes: projectPayload.notes,
+      completed_date: projectPayload.completed_date
+    });
+    return data;
+  };
+
+  const handleToggleWeeklyGoal = async (weekIdx, goalId) => {
+    if (!progressData) return;
+    const updatedWeeklyGoals = progressData.weekly_goals.map((w, wIdx) => {
+      if (wIdx === weekIdx) {
+        return {
+          ...w,
+          goals: w.goals.map(g => g.id === goalId ? { ...g, done: !g.done } : g)
+        };
+      }
+      return w;
+    });
+    setProgressData({ ...progressData, weekly_goals: updatedWeeklyGoals });
+    try {
+      await client.post("/roadmap/update-weekly-goals", updatedWeeklyGoals);
+    } catch {
+      // ignore
+    }
+  };
+
+  const handleExportRoadmap = async (format) => {
+    try {
+      setExporting(true);
+      const { data } = await client.post("/roadmap/export", { format });
+      const blob = new Blob([data.content], { type: format === "csv" ? "text/csv" : "text/plain" });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `roadmap-export-${targetRole.replace(/\s+/g, "-").toLowerCase()}.${format === "checklist" ? "txt" : format}`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+    } catch {
+      // ignore
+    } finally {
+      setExporting(false);
+    }
+  };
+
   const CACHE_KEY = "career_roadmap_cache";
   const CACHE_TTL_MS = 1000 * 60 * 30;
 
@@ -1903,6 +2142,11 @@ export default function RoadmapPage() {
       setRoadmap(roadmapResponse.data);
       saveCachedRoadmap(roadmapResponse.data);
 
+      fetchProgress();
+      fetchMentorSuggestion();
+      fetchAchievements();
+      fetchCompanies();
+
       try {
         const interviewResponse = await client.get("/interview/questions", { params });
         setInterviewPack(interviewResponse.data);
@@ -1934,6 +2178,11 @@ export default function RoadmapPage() {
         const role = data.desired_role || "";
         setTargetRole(role);
         setNeedsProfile(false);
+
+        fetchProgress();
+        fetchMentorSuggestion();
+        fetchAchievements();
+        fetchCompanies();
 
         const cached = loadCachedRoadmap();
         if (cached && !role) {
@@ -2048,7 +2297,9 @@ return (
             <form
               onSubmit={(event) => {
                 event.preventDefault();
-                loadRoadmap();
+                const correctedRole = correctRoleSpelling(targetRole);
+                setTargetRole(correctedRole);
+                loadRoadmap(correctedRole);
               }}
               className="mt-4 grid gap-3"
             >
@@ -2061,8 +2312,9 @@ return (
                   type="text"
                   value={targetRole}
                   onChange={(event) => setTargetRole(event.target.value)}
+                  onBlur={(event) => setTargetRole(correctRoleSpelling(event.target.value))}
                   placeholder="Target role, e.g. Product Support Engineer"
-                  className="field-input"
+                  className="field-input capitalize"
                   aria-label="Target role"
                 />
               </div>
@@ -2083,7 +2335,7 @@ return (
 
       {roadmap && (
         <div className="flex items-center justify-between print:hidden">
-          <ActionBar onPrint={handlePrint} onCopy={handleCopy} />
+          <ActionBar onPrint={handlePrint} onCopy={handleCopy} onExport={handleExportRoadmap} />
           <span className="text-xs text-slate-400">Last updated: {new Date().toLocaleDateString()}</span>
         </div>
       )}
@@ -2165,7 +2417,179 @@ return (
         </section>
       )}
 
-      <RoadmapTimeline roadmap={roadmap} />
+      {/* DAILY MENTOR & ACHIEVEMENTS */}
+      {roadmap && (
+        <section className="grid gap-6 md:grid-cols-2">
+          {/* Daily AI Mentor Card */}
+          <div className="rounded-[28px] border border-slate-200 bg-white p-6 shadow-[0_18px_40px_rgba(15,23,42,0.06)] flex flex-col justify-between">
+            <div>
+              <p className="font-mono text-xs uppercase tracking-[0.25em] text-blue-600">Daily AI Mentor Advice</p>
+              <h3 className="mt-3 text-xl font-bold text-slate-950">Today's Guidance Suggestion</h3>
+              <p className="mt-4 text-sm leading-7 text-slate-600 italic">
+                "{mentorSuggestion?.suggestion || "Maintain standard engineering practices and build your clean code portfolio milestones to impress hiring teams."}"
+              </p>
+            </div>
+            <div className="mt-6 text-xs text-slate-400">
+              Generated: {mentorSuggestion?.date || new Date().toLocaleDateString()}
+            </div>
+          </div>
+
+          {/* Achievements Card */}
+          <div className="rounded-[28px] border border-slate-200 bg-white p-6 shadow-[0_18px_40px_rgba(15,23,42,0.06)]">
+            <p className="font-mono text-xs uppercase tracking-[0.25em] text-emerald-600">Achievements & Badges</p>
+            <h3 className="mt-3 text-xl font-bold text-slate-950">Your Unlocked Badges</h3>
+            
+            <div className="mt-4 flex flex-wrap gap-2.5">
+              {achievements.length > 0 ? (
+                achievements.map((badge) => (
+                  <span
+                    key={badge}
+                    className="inline-flex items-center gap-1.5 rounded-full bg-emerald-50 px-3.5 py-1.5 text-xs font-bold text-emerald-800 border border-emerald-100"
+                  >
+                    <svg className="h-3.5 w-3.5 text-emerald-700 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M12 15a7 7 0 007-7V4H5v4a7 7 0 007 7zm0 0v4m-3 0h6m-9-6a3 3 0 01-3-3V5h3v2a3 3 0 003 3m6-5v2a3 3 0 003 3 3 3 0 003-3V5h-3z" />
+                    </svg>
+                    {badge}
+                  </span>
+                ))
+              ) : (
+                <p className="text-sm text-slate-500">Unlock your first badge by completing milestones or projects!</p>
+              )}
+            </div>
+          </div>
+        </section>
+      )}
+
+      {/* SMART NOTIFICATIONS & WEEKLY GOALS */}
+      {roadmap && progressData && (
+        <section className="grid gap-6 md:grid-cols-2">
+          {/* Weekly Goals */}
+          <div className="rounded-[28px] border border-slate-200 bg-white p-6 shadow-[0_18px_40px_rgba(15,23,42,0.06)]">
+            <p className="font-mono text-xs uppercase tracking-[0.25em] text-amber-600">Weekly AI Goals</p>
+            <h3 className="mt-3 text-xl font-bold text-slate-950">Week 1 & 2 Tasks</h3>
+            
+            <div className="mt-4 space-y-4">
+              {progressData.weekly_goals?.map((week, wIdx) => (
+                <div key={week.week} className="space-y-2">
+                  <h4 className="text-sm font-bold text-slate-900 border-b pb-1 mb-2">Week {week.week}</h4>
+                  <div className="space-y-2">
+                    {week.goals?.map((goal) => (
+                      <label key={goal.id} className="flex items-start gap-2.5 cursor-pointer text-sm leading-6 text-slate-700 select-none">
+                        <input
+                          type="checkbox"
+                          checked={goal.done}
+                          onChange={() => handleToggleWeeklyGoal(wIdx, goal.id)}
+                          className="mt-1 rounded text-blue-600 focus:ring-blue-500"
+                        />
+                        <span className={goal.done ? "line-through text-slate-400" : "text-slate-700"}>{goal.title}</span>
+                      </label>
+                    ))}
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          {/* Smart Notifications & Alerts */}
+          <div className="rounded-[28px] border border-slate-200 bg-white p-6 shadow-[0_18px_40px_rgba(15,23,42,0.06)]">
+            <p className="font-mono text-xs uppercase tracking-[0.25em] text-red-500">Smart Notifications</p>
+            <h3 className="mt-3 text-xl font-bold text-slate-950">Action Needed</h3>
+            
+            <div className="mt-4 space-y-3 text-sm">
+              {progressData?.weekly_goals?.some(w => w.goals?.some(g => !g.done)) && (
+                <div className="rounded-2xl border border-amber-200 bg-amber-50 p-4 text-amber-900 flex items-start gap-3">
+                  <svg className="h-5 w-5 text-amber-600 shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                  </svg>
+                  <span><strong>Weekly Goals:</strong> Some weekly task goals remain incomplete. Try to complete them this week.</span>
+                </div>
+              )}
+              {Object.keys(progressData?.projects || {}).length === 0 && (
+                <div className="rounded-2xl border border-blue-200 bg-blue-50 p-4 text-blue-900 flex items-start gap-3">
+                  <svg className="h-5 w-5 text-blue-600 shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                  </svg>
+                  <span><strong>Practice Projects:</strong> Start working on your mini projects to validate your skills.</span>
+                </div>
+              )}
+              {(!progressData?.last_active_date || (Date.now() - new Date(progressData.last_active_date).getTime() > 1000 * 60 * 60 * 24 * 3)) && (
+                <div className="rounded-2xl border border-red-200 bg-red-50 p-4 text-red-900 flex items-start gap-3">
+                  <svg className="h-5 w-5 text-red-600 shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" />
+                  </svg>
+                  <span><strong>Streak Overdue:</strong> No timeline activity recorded for 3 days. Complete a milestone to maintain your streak!</span>
+                </div>
+              )}
+              {progressData?.completed_milestones?.length > 0 && (
+                <div className="rounded-2xl border border-emerald-200 bg-emerald-50 p-4 text-emerald-900 flex items-start gap-3">
+                  <svg className="h-5 w-5 text-emerald-600 shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                  </svg>
+                  <span><strong>Success Tracker:</strong> You have unlocked progress towards matching hiring positions!</span>
+                </div>
+              )}
+            </div>
+          </div>
+        </section>
+      )}
+
+      {/* COMPANY READINESS RECOMMENDATIONS */}
+      {roadmap && companies.length > 0 && (
+        <section className="rounded-[28px] border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 p-6 shadow-[0_18px_40px_rgba(15,23,42,0.06)] print:hidden">
+          <p className="font-mono text-xs uppercase tracking-[0.25em] text-indigo-600 dark:text-indigo-400">Company Readiness Match</p>
+          <h3 className="mt-3 text-2xl font-bold text-slate-950 dark:text-slate-100">Recommended Hiring Positions</h3>
+          
+          <div className="mt-4 grid gap-4 sm:grid-cols-2">
+            {companies.map((comp) => (
+              <div key={comp.company_name} className="rounded-2xl border border-slate-100 dark:border-slate-700 bg-slate-50/50 dark:bg-slate-800/50 p-5 space-y-3">
+                <div className="flex items-center justify-between border-b dark:border-slate-700 pb-2 mb-2">
+                  <span className="font-bold text-xl text-slate-900 dark:text-slate-100">{comp.company_name}</span>
+                  <span className="rounded-full bg-indigo-100 dark:bg-indigo-900/40 text-indigo-900 dark:text-indigo-300 px-3 py-1.5 text-xs font-bold">
+                    {comp.match_percentage}% Match
+                  </span>
+                </div>
+                
+                <div className="space-y-1.5 text-sm">
+                  <div><span className="text-slate-500 dark:text-slate-400 font-semibold">Expected Salary:</span> <span className="font-bold text-slate-800 dark:text-slate-200">{comp.expected_salary}</span></div>
+                  <div><span className="text-slate-500 dark:text-slate-400 font-semibold">Hiring Trend:</span> <span className="font-bold text-emerald-600 dark:text-emerald-400">{comp.hiring_trend}</span></div>
+                  <div><span className="text-slate-500 dark:text-slate-400 font-semibold">Learning Priority:</span> <span className="font-bold text-amber-600 dark:text-amber-400">{comp.learning_priority}</span></div>
+                </div>
+
+                <div className="space-y-3 border-t dark:border-slate-700 pt-3 mt-3">
+                  <div>
+                    <span className="text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 block">Required Skills Met</span>
+                    <div className="flex flex-wrap gap-1.5 mt-1.5">
+                      {comp.required_skills?.map(s => (
+                        <span key={s} className="bg-slate-200 dark:bg-slate-700 text-slate-800 dark:text-slate-300 rounded-full px-2.5 py-1 text-xs font-bold">{s}</span>
+                      ))}
+                    </div>
+                  </div>
+                  <div>
+                    <span className="text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 block">Missing Skills</span>
+                    <div className="flex flex-wrap gap-1.5 mt-1.5">
+                      {comp.missing_skills?.map(s => (
+                        <span key={s} className="bg-rose-100 dark:bg-rose-900/40 text-rose-800 dark:text-rose-300 rounded-full px-2.5 py-1 text-xs font-bold">{s}</span>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        </section>
+      )}
+
+      <RoadmapTimeline
+        roadmap={roadmap}
+        progress={progressData?.completed_milestones ? Object.fromEntries(progressData.completed_milestones.map(m => [m, true])) : {}}
+        onToggleStep={handleToggleMilestone}
+        projectsProgress={progressData?.projects || {}}
+        onUpdateProject={handleUpdateProject}
+        onAnalyzeProject={handleAnalyzeProject}
+        learningProgress={progressData?.learning_resources || {}}
+        onUpdateResource={handleUpdateResource}
+        weeklyGoals={progressData?.weekly_goals || []}
+      />
 
       {roadmap && <RecommendedProjectsSection projects={roadmap.recommended_projects} targetRole={roadmap.target_role} />}
 

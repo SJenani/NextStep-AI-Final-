@@ -1,7 +1,8 @@
 import { useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import client, { getApiErrorMessage } from "../api/client";
 import { useAuth } from "../context/AuthContext";
+import { validateRealEmail } from "../utils/authValidation";
 
 export default function SignupPage() {
   const navigate = useNavigate();
@@ -35,6 +36,11 @@ export default function SignupPage() {
   const handleSubmit = async (event) => {
     event.preventDefault();
     setMessage("");
+    const emailError = validateRealEmail(form.email);
+    if (emailError) {
+      setMessage(emailError);
+      return;
+    }
     const pwdError = validatePassword(form.password);
     if (pwdError) {
       setMessage(pwdError);
@@ -43,7 +49,7 @@ export default function SignupPage() {
     try {
       const { data } = await client.post("/auth/signup", form);
       login(data);
-      navigate("/profile");
+      navigate("/dashboard");
     } catch (error) {
       const detail = getApiErrorMessage(error, "Unable to create account.");
       setShowReplaceFlow(detail === "Email already registered.");
@@ -58,6 +64,12 @@ export default function SignupPage() {
   const handleReplaceAccount = async () => {
     if (!form.full_name.trim() || !form.email.trim() || !form.password.trim() || !currentPassword.trim()) {
       setMessage("Enter full name, email, new password, and the current password to replace this account.");
+      return;
+    }
+
+    const emailError = validateRealEmail(form.email);
+    if (emailError) {
+      setMessage(emailError);
       return;
     }
 
@@ -76,7 +88,7 @@ export default function SignupPage() {
         new_password: form.password,
       });
       login(data);
-      navigate("/profile");
+      navigate("/dashboard");
     } catch (error) {
       setMessage(getApiErrorMessage(error, "Unable to replace account."));
     }
@@ -140,6 +152,13 @@ export default function SignupPage() {
               {message && <p className="text-sm font-semibold text-rose-600">{message}</p>}
               <button type="submit" className="primary-button">Create account</button>
             </form>
+            <p className="mt-5 text-sm text-slate-600">
+              Already have an account?{" "}
+              <Link to="/login" className="font-semibold text-tide underline underline-offset-4">
+                Sign in
+              </Link>
+              .
+            </p>
             {showReplaceFlow && (
               <div className="mt-8 rounded-3xl border border-amber-200 bg-amber-50/80 p-6">
                 <h3 className="font-display text-2xl font-semibold text-slate-950">Replace existing account</h3>
