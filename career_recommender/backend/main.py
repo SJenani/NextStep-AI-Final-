@@ -939,12 +939,12 @@ def _rewrite_resume_bullet(
             f"{heading}\n"
             f"{template.format(base_phrase=base_phrase, target_label=target_label)}"
         )
-
+    joined_versions = "\n\n".join(version_blocks)
     return (
         f"Here are stronger resume-ready versions for {target_label} roles.\n\n"
         f"Original:\n- {clean}\n\n"
         f"{keyword_line}"
-        f"{'\n\n'.join(version_blocks)}\n\n"
+       f"{joined_versions}\n\n"
         "Make it even stronger by replacing the placeholder with a number like users, accuracy, response time, projects completed, or time saved."
     )
 
