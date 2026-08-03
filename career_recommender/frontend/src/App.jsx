@@ -13,6 +13,7 @@ import RecommendationsPage from "./pages/RecommendationsPage";
 import ResumeUploadPage from "./pages/ResumeUploadPage";
 import RoadmapPage from "./pages/RoadmapPage";
 import SignupPage from "./pages/SignupPage";
+import AdminSettingsPage from "./pages/AdminSettingsPage";
 
 function AppShellRoutes() {
   return (
@@ -30,6 +31,7 @@ export default function App() {
         <Route path="/" element={<HomePage />} />
       <Route path="/signup" element={<SignupPage />} />
       <Route path="/login" element={<LoginPage />} />
+      <Route path="/admin/settings" element={<AdminSettingsPage />} />
       <Route
         path="/chatbot"
         element={

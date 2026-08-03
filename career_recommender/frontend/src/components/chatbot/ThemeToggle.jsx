@@ -1,30 +1,12 @@
-import { useState, useEffect } from 'react';
 import { Sun, Moon } from 'lucide-react';
 import { motion } from 'framer-motion';
+import { useTheme } from '../../context/ThemeContext';
 
 export default function ThemeToggle() {
-  const [theme, setTheme] = useState('light');
-
-  useEffect(() => {
-    const saved = localStorage.getItem('career_theme') || 'light';
-    setTheme(saved);
-    if (saved === 'dark') {
-      document.documentElement.classList.add('dark');
-    } else {
-      document.documentElement.classList.remove('dark');
-    }
-  }, []);
+  const { theme, setTheme } = useTheme();
 
   const toggleTheme = () => {
-    const next = theme === 'light' ? 'dark' : 'light';
-    setTheme(next);
-    localStorage.setItem('career_theme', next);
-    
-    if (next === 'dark') {
-      document.documentElement.classList.add('dark');
-    } else {
-      document.documentElement.classList.remove('dark');
-    }
+    setTheme(theme === 'light' ? 'dark' : 'light');
   };
 
   return (

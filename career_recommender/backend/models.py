@@ -35,6 +35,16 @@ class Profile(Base):
     mode = Column(String(30), nullable=False, default="job")
     desired_role = Column(String(120), nullable=True)
     resume_text = Column(Text, nullable=True)
+    
+    # Gamification Fields
+    current_streak = Column(Integer, default=0, nullable=False)
+    highest_streak = Column(Integer, default=0, nullable=False)
+    last_active_date = Column(String(50), nullable=True)
+    badges = Column(JSON, default=list, nullable=False)
+    weekly_applications = Column(Integer, default=0, nullable=False)
+    weekly_mock_interviews = Column(Integer, default=0, nullable=False)
+    week_start_date = Column(String(50), nullable=True)
+    
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False)
 
     user = relationship("User", back_populates="profile")

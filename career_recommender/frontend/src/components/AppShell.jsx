@@ -9,11 +9,13 @@ import {
   Lightbulb,
   LogOut,
   Map,
+  Menu,
   Sparkles,
   User,
 } from "lucide-react";
 import { useAuth } from "../context/AuthContext";
 import ThemePanel from "./ThemePanel";
+import GlobalSearch from "./GlobalSearch";
 
 const publicNavItems = [{ label: "Dashboard", to: "/", Icon: LayoutDashboard }];
 const privateNavItems = [
@@ -38,6 +40,7 @@ export default function AppShell({ children }) {
     if (typeof window === "undefined") return false;
     return window.localStorage.getItem("nextstep-sidebar-collapsed") === "true";
   });
+  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [isProfileOpen, setIsProfileOpen] = useState(false);
   const [profilePhoto, setProfilePhoto] = useState("");
   const profileRef = useRef(null);
@@ -63,6 +66,10 @@ export default function AppShell({ children }) {
   useEffect(() => {
     window.localStorage.setItem("nextstep-sidebar-collapsed", String(isSidebarCollapsed));
   }, [isSidebarCollapsed]);
+
+  useEffect(() => {
+    setIsMobileMenuOpen(false);
+  }, [location.pathname]);
 
   useEffect(() => {
     const loadProfilePhoto = () => {
@@ -93,7 +100,14 @@ export default function AppShell({ children }) {
   }, []);
 
   return (
-    <div className={`shell-layout ${isSidebarCollapsed ? "is-collapsed" : "is-expanded"}`}>
+    <div className={`shell-layout ${isSidebarCollapsed ? "is-collapsed" : "is-expanded"} ${isMobileMenuOpen ? "is-mobile-open" : ""}`}>
+      {isMobileMenuOpen && (
+        <div 
+          className="shell-mobile-overlay" 
+          onClick={() => setIsMobileMenuOpen(false)} 
+          aria-hidden="true" 
+        />
+      )}
       <aside className="shell-sidebar print:hidden" aria-label="Primary navigation">
         <div className="shell-sidebar-brand-row">
           <NavLink to="/" className="shell-sidebar-brand" title={isSidebarCollapsed ? "Next Step AI" : undefined}>
@@ -106,7 +120,7 @@ export default function AppShell({ children }) {
           </NavLink>
           <button
             type="button"
-            className="shell-sidebar-toggle"
+            className="shell-sidebar-toggle hidden md:flex"
             onClick={() => setIsSidebarCollapsed((collapsed) => !collapsed)}
             aria-label={isSidebarCollapsed ? "Open navigation" : "Close navigation"}
             aria-pressed={!isSidebarCollapsed}
@@ -117,6 +131,13 @@ export default function AppShell({ children }) {
               <span />
               <span />
             </span>
+          </button>
+          <button 
+            type="button" 
+            className="shell-mobile-close md:hidden p-2 text-slate-500 hover:text-slate-800 dark:text-slate-400 dark:hover:text-slate-100"
+            onClick={() => setIsMobileMenuOpen(false)}
+          >
+            <Menu className="h-6 w-6" />
           </button>
         </div>
 
@@ -186,11 +207,20 @@ export default function AppShell({ children }) {
 
       <div className="shell-workspace">
         <header className="shell-topbar print:hidden">
-          <div className="shell-topbar-left">
+          <div className="shell-topbar-left flex items-center gap-2">
+            <button
+              type="button"
+              className="md:hidden p-1.5 text-slate-500 hover:text-slate-800 dark:text-slate-400 dark:hover:text-slate-100 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 rounded-lg transition-colors"
+              onClick={() => setIsMobileMenuOpen(true)}
+              aria-label="Open mobile menu"
+            >
+              <Menu className="h-5 w-5" />
+            </button>
             <h1 className="shell-page-title">{currentPageTitle}</h1>
           </div>
 
           <div className="shell-topbar-actions">
+            <GlobalSearch />
             <ThemePanel compact />
           </div>
         </header>

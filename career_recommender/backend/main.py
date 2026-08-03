@@ -249,6 +249,17 @@ def apply_for_internal_job(payload: schemas.ApplicationCreate, db: Session = Dep
     db.add(application)
     db.commit()
     db.refresh(application)
+    
+    # Gamification
+    user = db.query(models.User).filter(models.User.email == application.email).first()
+    if user:
+        profile = db.query(models.Profile).filter(models.Profile.user_id == user.id).first()
+        if profile:
+            profile.weekly_applications += 1
+            if "first_application" not in profile.badges:
+                profile.badges = list(profile.badges) + ["first_application"]
+            db.commit()
+            
     return application
 
 
@@ -673,10 +684,6 @@ async def generate_openai_chat_response(
                 recommendation_bundle=recommendation_bundle,
                 resume_audit=resume_audit,
                 bookmarks=bookmarks,
-            )
-            fallback_answer = (
-                f"{fallback_answer}\n\n"
-                "Note: OpenAI is temporarily rate-limited, so I used the built-in mentor logic for this answer."
             )
             suggestions = _generate_suggestions(question, profile, recommendation_bundle)
             return fallback_answer, "local-fallback", suggestions
@@ -1171,7 +1178,40 @@ def create_or_update_profile(
 
 @app.get("/profile/view", response_model=schemas.ProfileOut)
 def view_profile(current_user: models.User = Depends(get_current_user), db: Session = Depends(get_db)):
-    return get_profile_or_404(db, current_user.id)
+    profile = get_profile_or_404(db, current_user.id)
+    
+    from datetime import datetime, timedelta
+    today = datetime.utcnow().date()
+    today_str = today.isoformat()
+    
+    # Check week start (Monday)
+    current_week_start = today - timedelta(days=today.weekday())
+    current_week_start_str = current_week_start.isoformat()
+    
+    if profile.week_start_date != current_week_start_str:
+        profile.weekly_applications = 0
+        profile.weekly_mock_interviews = 0
+        profile.week_start_date = current_week_start_str
+        
+    # Check streak
+    if profile.last_active_date:
+        last_active = datetime.strptime(profile.last_active_date, "%Y-%m-%d").date()
+        if last_active == today - timedelta(days=1):
+            profile.current_streak += 1
+            if profile.current_streak > profile.highest_streak:
+                profile.highest_streak = profile.current_streak
+        elif last_active < today - timedelta(days=1):
+            profile.current_streak = 1
+    else:
+        profile.current_streak = 1
+        
+    if profile.last_active_date != today_str:
+        profile.last_active_date = today_str
+        
+    db.commit()
+    db.refresh(profile)
+    
+    return profile
 
 
 # ---------------------------------------------------------------------
@@ -2052,6 +2092,13 @@ async def upload_interview_recording(
     if not existing:
         db.add(recording)
 
+    # Gamification
+    profile = db.query(models.Profile).filter(models.Profile.user_id == current_user.id).first()
+    if profile:
+        profile.weekly_mock_interviews += 1
+        if "first_mock_interview" not in profile.badges:
+            profile.badges = list(profile.badges) + ["first_mock_interview"]
+        
     db.commit()
     db.refresh(recording)
 
@@ -2330,3 +2377,30 @@ async def star_audit(
     except Exception as e:
         logger.exception(f"Failed to perform STAR audit: {e}")
         raise HTTPException(status_code=500, detail="Failed to perform STAR audit")
+
+from pydantic import BaseModel
+class OpenAIKeyUpdate(BaseModel):
+    api_key: str
+    admin_password: str
+
+@app.post("/admin/config/openai")
+def update_openai_key(payload: OpenAIKeyUpdate):
+    expected_password = os.getenv("ADMIN_PASSWORD", "admin123")
+    if payload.admin_password != expected_password:
+        raise HTTPException(status_code=401, detail="Invalid admin password")
+    
+    try:
+        from dotenv import set_key
+        # Update in-memory environment variable immediately
+        os.environ["OPENAI_API_KEY"] = payload.api_key
+        
+        # Determine .env path
+        env_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), ".env")
+        
+        # Persist to .env file
+        set_key(env_path, "OPENAI_API_KEY", payload.api_key)
+        
+        return {"status": "success", "message": "API key updated successfully"}
+    except Exception as e:
+        logger.exception(f"Failed to update API key: {e}")
+        raise HTTPException(status_code=500, detail="Failed to update API key")

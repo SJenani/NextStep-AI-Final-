@@ -17,11 +17,13 @@ import AchievementBadges from "../components/dashboard/AchievementBadges";
 import DashboardFilters from "../components/dashboard/DashboardFilters";
 import ExportOptions from "../components/dashboard/ExportOptions";
 import Charts from "../components/dashboard/Charts";
+import ProgressTracker from "../components/dashboard/ProgressTracker";
 import { EmptyState } from "../components/dashboard/shared";
 import { buildDashboardModel, DEFAULT_FILTERS } from "../components/dashboard/model";
 
 export default function DashboardPage({ view = "dashboard" }) {
   const [dashboard, setDashboard] = useState(null);
+  const [profile, setProfile] = useState(null);
   const [message, setMessage] = useState("");
   const [selectedDnaId, setSelectedDnaId] = useState("");
   const [loading, setLoading] = useState(true);
@@ -46,6 +48,7 @@ export default function DashboardPage({ view = "dashboard" }) {
 
         if (profileRes.status === "fulfilled" && profileRes.value.data) {
           const profile = profileRes.value.data;
+          setProfile(profile);
           const capitalize = (str) => {
             if (!str) return "";
             return str.charAt(0).toUpperCase() + str.slice(1).toLowerCase();
@@ -131,6 +134,7 @@ export default function DashboardPage({ view = "dashboard" }) {
         <DashboardFilters filters={filters} onChange={setFilters} model={model} />
         <ExportOptions model={model} />
       </div>
+      <ProgressTracker profile={profile} />
       <CareerOverview model={model} />
       {dashboard ? (
         <>
@@ -149,7 +153,7 @@ export default function DashboardPage({ view = "dashboard" }) {
               <LearningRecommendations model={model} />
               <SmartRecommendations model={model} />
               <RecentActivity model={model} />
-              <AchievementBadges model={model} />
+              <AchievementBadges model={model} profile={profile} />
             </aside>
           </div>
         </>

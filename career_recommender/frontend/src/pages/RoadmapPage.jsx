@@ -463,6 +463,61 @@ function MockInterviewFocusOverlay({
   speakingKey,
   onClose,
 }) {
+  const [isListening, setIsListening] = useState(false);
+  const recognitionRef = useRef(null);
+  const baseNoteRef = useRef(note || "");
+
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+      if (SpeechRecognition) {
+        recognitionRef.current = new SpeechRecognition();
+        recognitionRef.current.continuous = true;
+        recognitionRef.current.interimResults = true;
+        
+        recognitionRef.current.onresult = (event) => {
+          let currentTranscript = "";
+          for (let i = 0; i < event.results.length; i++) {
+            currentTranscript += event.results[i][0].transcript;
+          }
+          const separator = baseNoteRef.current && !baseNoteRef.current.endsWith(" ") ? " " : "";
+          onNoteChange(baseNoteRef.current + separator + currentTranscript);
+        };
+
+        recognitionRef.current.onerror = (event) => {
+          console.error("Speech recognition error", event.error);
+          setIsListening(false);
+        };
+
+        recognitionRef.current.onend = () => {
+          setIsListening(false);
+        };
+      }
+    }
+    
+    return () => {
+      if (recognitionRef.current) {
+        recognitionRef.current.stop();
+      }
+    };
+  }, [onNoteChange]);
+
+  const toggleListening = () => {
+    if (!recognitionRef.current) {
+      alert("Speech recognition is not supported in your browser. Please try Chrome or Edge.");
+      return;
+    }
+    
+    if (isListening) {
+      recognitionRef.current.stop();
+      setIsListening(false);
+    } else {
+      baseNoteRef.current = note || "";
+      recognitionRef.current.start();
+      setIsListening(true);
+    }
+  };
+
   if (!prompt) {
     return null;
   }
@@ -606,9 +661,20 @@ function MockInterviewFocusOverlay({
 
           <div className="space-y-5">
             <div className="rounded-3xl border border-slate-200 bg-white p-5">
-              <label htmlFor={`focus-note-${promptKey}`} className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">
-                Your answer notes
-              </label>
+              <div className="flex items-center justify-between">
+                <label htmlFor={`focus-note-${promptKey}`} className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">
+                  Your answer notes
+                </label>
+                <button
+                  type="button"
+                  onClick={toggleListening}
+                  className={`rounded-full px-3 py-1 text-xs font-semibold transition ${
+                    isListening ? "bg-red-100 text-red-600 animate-pulse" : "bg-slate-100 text-slate-600 hover:bg-slate-200"
+                  }`}
+                >
+                  {isListening ? "⏹ Stop dictation" : "🎙️ Voice typing"}
+                </button>
+              </div>
               <textarea
                 id={`focus-note-${promptKey}`}
                 value={note}
@@ -1573,7 +1639,22 @@ function InterviewPrepSection({ interviewPack, targetRole }) {
 
     try {
       if (!mediaStreamRef.current) {
-        mediaStreamRef.current = await navigator.mediaDevices.getUserMedia({ audio: true });
+        if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+          alert("Audio recording is not supported or requires a secure connection (HTTPS).");
+          return;
+        }
+        try {
+          mediaStreamRef.current = await navigator.mediaDevices.getUserMedia({
+            audio: {
+              noiseSuppression: true,
+              echoCancellation: true,
+              autoGainControl: true
+            }
+          });
+        } catch (err) {
+          console.warn("Failed with advanced constraints, trying basic audio.", err);
+          mediaStreamRef.current = await navigator.mediaDevices.getUserMedia({ audio: true });
+        }
       }
 
       const key = `${type}-${index}`;
@@ -1601,7 +1682,9 @@ function InterviewPrepSection({ interviewPack, targetRole }) {
       };
       recorder.start();
       setRecordingKey(key);
-    } catch {
+    } catch (err) {
+      console.error("Recording start error:", err);
+      alert("Could not start recording. Please ensure you have granted microphone permissions.");
       setRecordingKey("");
     }
   };

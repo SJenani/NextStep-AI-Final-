@@ -1,9 +1,13 @@
 import { Award } from "lucide-react";
 import { SectionHeading } from "./shared";
 
-export default function AchievementBadges({ model }) {
+export default function AchievementBadges({ model, profile }) {
   const skillSet = new Set(model.matchedSkills.map((skill) => String(skill).toLowerCase()));
+  const profileBadges = new Set(profile?.badges || []);
+  
   const badges = [
+    ["First Application", profileBadges.has("first_application")],
+    ["First Mock Interview", profileBadges.has("first_mock_interview")],
     ["React Expert", skillSet.has("react")],
     ["Backend Ready", ["fastapi", "backend", "node.js", "api"].some((skill) => skillSet.has(skill))],
     ["API Builder", ["api", "rest api", "fastapi"].some((skill) => skillSet.has(skill))],

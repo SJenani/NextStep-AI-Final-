@@ -200,6 +200,13 @@ class ProfileOut(BaseModel):
     mode: str
     desired_role: str | None = None
     resume_text: str | None = None
+    current_streak: int = 0
+    highest_streak: int = 0
+    last_active_date: str | None = None
+    badges: list[str] = []
+    weekly_applications: int = 0
+    weekly_mock_interviews: int = 0
+    week_start_date: str | None = None
 
     model_config = ConfigDict(from_attributes=True)
 

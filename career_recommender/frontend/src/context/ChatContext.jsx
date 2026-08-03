@@ -56,8 +56,10 @@ export const ChatProvider = ({ children }) => {
   const [resumeMessage, setResumeMessage] = useState("");
   const [profilePhoto, setProfilePhoto] = useState("");
   const [historySearch, setHistorySearch] = useState("");
-  
-  const historyHydratedRef = useRef(false);
+  const [isHydrated, setIsHydrated] = useState(false);
+  const [isMuted, setIsMuted] = useState(false);
+  const [isInterviewMode, setIsInterviewMode] = useState(false);
+  const [isSpeaking, setIsSpeaking] = useState(false);
 
   useEffect(() => {
     async function fetchProfile() {
@@ -86,7 +88,7 @@ export const ChatProvider = ({ children }) => {
   }, [user?.id, user?.email]);
 
   useEffect(() => {
-    historyHydratedRef.current = false;
+    setIsHydrated(false);
     try {
       const raw = localStorage.getItem(getChatStorageKey(user));
       const parsed = raw ? JSON.parse(raw) : null;
@@ -112,17 +114,32 @@ export const ChatProvider = ({ children }) => {
       setActiveIndex(savedActiveIndex);
       setSuggestions([]);
       setError("");
+      
+      // Attempt to restore interview mode based on recent messages
+      if (savedMessages.length > 0) {
+        for (let i = savedMessages.length - 1; i >= 0; i--) {
+          const msg = savedMessages[i].content.toLowerCase();
+          if (msg.includes("end interview") || msg.includes("stop interview") || msg.includes("exit interview")) {
+            setIsInterviewMode(false);
+            break;
+          }
+          if (msg.includes("start mock interview")) {
+            setIsInterviewMode(true);
+            break;
+          }
+        }
+      }
     } catch {
       setConversations([]);
       setMessages([]);
       setActiveIndex(-1);
     } finally {
-      historyHydratedRef.current = true;
+      setIsHydrated(true);
     }
   }, [user?.id, user?.email]);
 
   useEffect(() => {
-    if (!historyHydratedRef.current) return;
+    if (!isHydrated) return;
 
     const storedConversations = conversations
       .map((conversation, index) =>
@@ -172,9 +189,20 @@ export const ChatProvider = ({ children }) => {
     }
   };
 
-  const sendMessage = async (text) => {
+  const sendMessage = async (text, options = {}) => {
+    const { isVoice = false } = options;
     const trimmed = text.trim();
     if (!trimmed || loading) return;
+    
+    const textLower = trimmed.toLowerCase();
+    let currentInterviewMode = isInterviewMode;
+    if (textLower.includes("start mock interview")) {
+      currentInterviewMode = true;
+      setIsInterviewMode(true);
+    } else if (textLower.includes("end interview") || textLower.includes("stop interview") || textLower.includes("exit interview")) {
+      currentInterviewMode = false;
+      setIsInterviewMode(false);
+    }
 
     const history = messages.slice(-6).map((message) => ({
       role: message.role,
@@ -202,6 +230,41 @@ export const ChatProvider = ({ children }) => {
       const answer = response.data?.answer || "I couldn't get a response. Please try again.";
       setMessages((prev) => [...prev, { role: "assistant", content: answer }]);
       setSuggestions(response.data?.suggestions || []);
+      
+      const shouldSpeak = (isVoice || currentInterviewMode) && !isMuted;
+      if (shouldSpeak && typeof window !== "undefined" && "speechSynthesis" in window) {
+        window.speechSynthesis.cancel(); // Stop any ongoing speech
+        const plainText = answer.replace(/[#*_`~>]/g, '').trim(); // Remove basic markdown
+        const utterance = new SpeechSynthesisUtterance(plainText);
+        
+        // Try to select a pleasant, clear voice
+        const voices = window.speechSynthesis.getVoices();
+        
+        // Look for premium, natural, or high-quality default voices
+        const preferredVoice = voices.find(v => v.name.includes('Natural')) ||
+                               voices.find(v => v.name.includes('Premium')) ||
+                               voices.find(v => v.name.includes('Google US English')) ||
+                               voices.find(v => v.name.includes('Google UK English Female')) ||
+                               voices.find(v => v.name.includes('Microsoft Aria Online')) ||
+                               voices.find(v => v.name.includes('Microsoft Zira')) ||
+                               voices.find(v => v.name.includes('Samantha')) ||
+                               voices.find(v => v.lang.startsWith('en') && v.name.includes('Female')) ||
+                               voices.find(v => v.lang.startsWith('en-US'));
+
+        if (preferredVoice) {
+          utterance.voice = preferredVoice;
+        }
+
+        // Tweak rate and pitch for a friendlier, clearer tone
+        utterance.rate = 1.05; // Slightly faster for conversational pace
+        utterance.pitch = 1.05; // Slightly higher pitch for a friendlier sound
+
+        utterance.onstart = () => setIsSpeaking(true);
+        utterance.onend = () => setIsSpeaking(false);
+        utterance.onerror = () => setIsSpeaking(false);
+
+        window.speechSynthesis.speak(utterance);
+      }
     } catch (err) {
       const errorMsg = err.response?.data?.detail || err.message || "Unable to reach the mentor.";
       setError(errorMsg);
@@ -298,6 +361,16 @@ export const ChatProvider = ({ children }) => {
     }
   };
 
+  const toggleMute = () => {
+    setIsMuted((prev) => {
+      const next = !prev;
+      if (next && typeof window !== "undefined" && "speechSynthesis" in window) {
+        window.speechSynthesis.cancel();
+      }
+      return next;
+    });
+  };
+
   return (
     <ChatContext.Provider
       value={{
@@ -317,6 +390,10 @@ export const ChatProvider = ({ children }) => {
         profilePhoto,
         historySearch,
         setHistorySearch,
+        isMuted,
+        toggleMute,
+        isSpeaking,
+        isInterviewMode,
         getQuickPrompts,
         sendMessage,
         handleResumeUpload,

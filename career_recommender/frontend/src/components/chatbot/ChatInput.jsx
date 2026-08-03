@@ -1,16 +1,75 @@
-import { useState } from 'react';
-import { Sparkles, Send, Loader2 } from 'lucide-react';
+import { useState, useEffect, useRef } from 'react';
+import { Sparkles, Send, Loader2, Mic, MicOff, Volume2, VolumeX } from 'lucide-react';
 import { useChat } from '../../context/ChatContext';
 
 export default function ChatInput() {
-  const { sendMessage, loading } = useChat();
+  const { sendMessage, loading, isMuted, toggleMute, isSpeaking, isInterviewMode } = useChat();
   const [inputText, setInputText] = useState("");
+  const [isListening, setIsListening] = useState(false);
+  const [wasVoiceInput, setWasVoiceInput] = useState(false);
+  const recognitionRef = useRef(null);
+
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+      if (SpeechRecognition) {
+        recognitionRef.current = new SpeechRecognition();
+        recognitionRef.current.continuous = true;
+        recognitionRef.current.interimResults = true;
+        
+        recognitionRef.current.onresult = (event) => {
+          let currentTranscript = "";
+          for (let i = 0; i < event.results.length; i++) {
+            currentTranscript += event.results[i][0].transcript;
+          }
+          setInputText(currentTranscript);
+          setWasVoiceInput(true);
+        };
+
+        recognitionRef.current.onerror = (event) => {
+          console.error("Speech recognition error", event.error);
+          setIsListening(false);
+        };
+
+        recognitionRef.current.onend = () => {
+          setIsListening(false);
+        };
+      }
+    }
+  }, []);
+
+  const toggleListening = (e) => {
+    e.preventDefault();
+    if (!recognitionRef.current) {
+      alert("Speech recognition is not supported in your browser. Please try Chrome or Edge.");
+      return;
+    }
+    
+    if (isListening) {
+      recognitionRef.current.stop();
+      setIsListening(false);
+    } else {
+      setInputText("");
+      setWasVoiceInput(false);
+      recognitionRef.current.start();
+      setIsListening(true);
+    }
+  };
 
   const handleSubmit = (e) => {
     e.preventDefault();
+    let isVoice = wasVoiceInput;
+    
+    if (isListening) {
+      isVoice = true;
+      recognitionRef.current?.stop();
+      setIsListening(false);
+    }
+    
     if (inputText.trim() && !loading) {
-      sendMessage(inputText);
+      sendMessage(inputText, { isVoice });
       setInputText("");
+      setWasVoiceInput(false);
     }
   };
 
@@ -27,11 +86,51 @@ export default function ChatInput() {
         type="text"
         value={inputText}
         onChange={(e) => setInputText(e.target.value)}
-        placeholder="Ask anything..."
+        placeholder={isListening ? "Listening..." : "Ask anything..."}
         disabled={loading}
-        className="flex-1 bg-transparent px-2 py-2 text-[14px] text-gray-800 dark:text-gray-200 outline-none placeholder:text-gray-400 disabled:opacity-50"
+        className={`flex-1 bg-transparent px-2 py-2 text-[14px] outline-none disabled:opacity-50 ${
+          isListening ? "text-blue-600 dark:text-blue-400 placeholder:text-blue-400 dark:placeholder:text-blue-500" : "text-gray-800 dark:text-gray-200 placeholder:text-gray-400"
+        }`}
       />
       
+      {(isListening || isSpeaking || isInterviewMode) && (
+        <button
+          type="button"
+          onClick={toggleMute}
+          disabled={loading}
+          className={`flex h-[38px] w-[38px] shrink-0 items-center justify-center rounded-full transition-all duration-300 disabled:cursor-not-allowed disabled:opacity-50 ${
+            isMuted
+              ? "bg-orange-100 text-orange-500 hover:bg-orange-200 dark:bg-orange-500/20 dark:text-orange-400 dark:hover:bg-orange-500/30"
+              : "bg-gray-100 text-gray-500 hover:bg-gray-200 dark:bg-slate-700 dark:text-gray-400 dark:hover:bg-slate-600"
+          }`}
+          aria-label="Toggle voice output"
+        >
+          {isMuted ? (
+            <VolumeX className="h-4 w-4" />
+          ) : (
+            <Volume2 className="h-4 w-4" />
+          )}
+        </button>
+      )}
+
+      <button
+        type="button"
+        onClick={toggleListening}
+        disabled={loading}
+        className={`flex h-[38px] w-[38px] shrink-0 items-center justify-center rounded-full transition-all duration-300 disabled:cursor-not-allowed disabled:opacity-50 ${
+          isListening 
+            ? "bg-red-100 text-red-500 hover:bg-red-200 dark:bg-red-500/20 dark:text-red-400 dark:hover:bg-red-500/30 shadow-sm animate-pulse" 
+            : "bg-gray-100 text-gray-500 hover:bg-gray-200 dark:bg-slate-700 dark:text-gray-400 dark:hover:bg-slate-600"
+        }`}
+        aria-label="Toggle voice input"
+      >
+        {isListening ? (
+          <MicOff className="h-4 w-4" />
+        ) : (
+          <Mic className="h-4 w-4" />
+        )}
+      </button>
+
       <button
         type="submit"
         disabled={!inputText.trim() || loading}
