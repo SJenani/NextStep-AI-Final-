@@ -1,7 +1,7 @@
 import axios from "axios";
 
 const client = axios.create({
-  baseURL: import.meta.env.VITE_API_BASE_URL=https://nextstep-ai-final-production.up.railway.app
+  baseURL: "https://nextstep-ai-final-production.up.railway.app",
 });
 
 client.interceptors.request.use((config) => {
