@@ -76,26 +76,6 @@ app = FastAPI(
     description="FastAPI backend for real-time job recommendations, skill gap analysis, roadmap generation, and career mentoring.",
     version="1.0.0",
 )
-
-@app.on_event("startup")
-def startup_event():
-    start_scheduler()
-
-@app.on_event("shutdown")
-def shutdown_event():
-    stop_scheduler()
-
-# Attach semantic recommender to app state (global singleton)
-app.state.recommender = SemanticRecommender()
-
-# Register router (job_api.py)
-app.include_router(job_router)
-app.include_router(employer_router)
-app.mount("/media", StaticFiles(directory=MEDIA_DIR), name="media")
-
-# ---------------------------------------------------------------------
-# CORS
-# ---------------------------------------------------------------------
 app.add_middleware(
     CORSMiddleware,
     allow_origins=[
@@ -103,7 +83,6 @@ app.add_middleware(
         "http://127.0.0.1:5173",
         "http://localhost:5174",
         "http://127.0.0.1:5174",
-
         "https://nextsteppro.in",
         "https://www.nextsteppro.in",
     ],
@@ -112,6 +91,16 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+@app.on_event("startup")
+def startup_event():
+    start_scheduler()
+
+app.state.recommender = SemanticRecommender()
+
+app.include_router(job_router)
+app.include_router(employer_router)
+app.mount("/media", StaticFiles(directory=MEDIA_DIR), name="media")
 # ---------------------------------------------------------------------
 # Startup / Shutdown
 # ---------------------------------------------------------------------
